@@ -29,3 +29,15 @@
 .reagent-state-preview .state-demo-tag { color: #78879A; font-size: 9px; font-weight: 500; white-space: nowrap; }
 .reagent-item .reagent-state-preview { line-height: 1.2; }
 @media (max-width: 420px) { .search-row { gap: 6px; } .search-row #clearSearch { padding: 10px 12px; } .reagent-state-preview { gap: 4px; } }
+
+/* Manual confirmation controls are confined to the existing dashboard design. */
+.demo-state-control { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:14px 0; padding:14px 16px; background:#F6F8FB; border:1px solid var(--line, #E3E7EF); border-radius:10px; }
+.demo-state-control > div { display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 190px; }
+.demo-state-control strong { font-size:13px; color:var(--blue-dark, #213752); }
+.demo-state-control small { font-size:11px; color:var(--muted, #68798A); line-height:1.6; }
+.demo-state-control .button { flex:0 1 auto; width:auto; max-width:100%; white-space:normal; word-break:keep-all; text-align:center; }
+.demo-fix-button { display:inline-flex; margin-top:8px; padding:7px 10px; border:1px solid #A8BDD8; border-radius:7px; background:#fff; color:#315681; font:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+.demo-fix-button:hover { background:#EFF5FC; }
+@media(max-width:420px){ .demo-state-control .button { width:100%; } }
+
+.reagent-state-chip.state-unknown { background:#EFF1F4; color:#737E8D; }
