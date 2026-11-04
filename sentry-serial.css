@@ -1,0 +1,25 @@
+/* Only the new HC-06 receiver is styled here; existing site styles are retained. */
+.serial-panel { margin:0 0 24px; }
+.serial-heading { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:12px; }
+.serial-heading h3 { margin:0 0 7px; }
+.serial-heading p { margin:0; line-height:1.7; }
+.serial-source { display:inline-block; padding:7px 10px; border-radius:7px; font-size:11px; font-weight:700; }
+.serial-good { background:#E4F5EE; color:#247A61; }
+.serial-neutral { background:#EFF1F4; color:#647184; }
+.serial-controls { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin:18px 0 12px; }
+.serial-controls label { flex:1 1 250px; font-size:12px; font-weight:700; }
+.serial-controls select { display:block; width:100%; margin-top:7px; padding:11px; border:1px solid var(--line); background:white; border-radius:8px; color:var(--text); font:inherit; }
+.serial-controls button { flex:0 0 auto; }
+.serial-controls :disabled { opacity:.55; cursor:not-allowed; }
+.serial-controls :focus-visible { outline:2px solid #6689B8; outline-offset:3px; }
+.serial-status { margin:10px 0; font-size:12px; line-height:1.7; }
+.serial-time { font-size:11px; color:var(--muted); }
+.serial-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:16px 0; }
+.serial-values > div { min-width:0; padding:14px; border:1px solid var(--line); border-radius:9px; background:#F7F9FC; }
+.serial-values small { display:block; color:var(--muted); font-size:11px; margin-bottom:7px; }
+.serial-values b { font-size:15px; overflow-wrap:anywhere; }
+.serial-note { font-size:11px; line-height:1.8; color:var(--muted); }
+.serial-panel details { margin-top:13px; font-size:12px; }
+.serial-panel summary { cursor:pointer; color:var(--blue-dark); }
+.serial-panel pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto; background:#F7F9FC; border:1px solid var(--line); padding:12px; border-radius:8px; font-size:11px; line-height:1.6; }
+@media(max-width:620px) { .serial-values { grid-template-columns:repeat(2,minmax(0,1fr)); } .serial-controls .button { flex:1 1 120px; } }
