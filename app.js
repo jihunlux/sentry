@@ -4,7 +4,7 @@
   const slides = [
     { title: '시약의 보관 환경을<br><span>더 체계적으로</span> 관리하다', description: '시약별 보관 조건과 센서 정보를 한곳에서 확인하고, 필요한 관리 항목을 놓치지 않도록 도와줍니다.' },
     { title: '시약마다 다른 조건을<br><span>맞춤형으로</span> 확인하다', description: '입력한 시약 정보를 바탕으로 확인해야 할 항목과 추가 센서 후보를 살펴보세요.' },
-    { title: '센서 정보를 연결해<br><span>더 안전한 관리로</span>', description: '기본 환경 정보와 선택형 센서 모듈을 구분해 관리할 수 있도록 설계했습니다.' }
+    { title: '센서 정보를 연결해<br><span>더 안전한 관리로</span>', description: '시약의 특성과 보관 환경에 필요한 측정 정보를 확인할 수 있도록 설계했습니다.' }
   ];
   let slideIndex = 0, slideTimer = null, toastTimer = null;
   const $ = (id) => document.getElementById(id);
@@ -62,14 +62,23 @@
   function getSensorAdvice(item) {
     const advice = [];
     const text = `${item.name} ${item.formula} ${item.notes}`.toLowerCase();
-    if (/빛|광분해|감광|photosens|light|peroxide|과산화수소|질산은|agno3/.test(text)) {
-      advice.push({ name:"광학 센서", reason:"빛 노출 관리가 관련될 가능성이 있습니다. 실제 광민감성과 필요한 파장·노출 기준을 SDS에서 확인하세요." });
-    }
     if (/휘발|기체|가스|증기|volatile|gas|nh3|hcl|cl2|so2|h2s/.test(text) || item.formType === "gas") {
       advice.push({ name:"전용 가스 센서", reason:"휘발성 또는 기체 관련 위험을 확인할 필요가 있을 수 있습니다. 대상 기체에 맞는 전용 센서인지 확인해야 합니다." });
     }
     if (/산패|식품|기름|오일|산화|rancid|oil|food/.test(text)) {
       advice.push({ name:"검증된 산화 지표 센서", reason:"식품 산패 확장을 고려할 수 있습니다. 산패 지표에 대한 직접 측정과 기준 시료 비교가 필요합니다." });
+    }
+    if (/전기화학|전극|이온|ph|산화환원|electrochem|산성|염기성|염산|황산|아세트산|인산|수산화나트륨|수산화칼륨/.test(text)) {
+      advice.push({ name:"pH 센서", reason:"수용액의 산성도 변화가 확인 목표일 때 검토할 수 있습니다. 용액 종류에 맞는 전극과 측정 조건이 필요하며 모든 시약에 적용되지는 않습니다." });
+    }
+    if (/색|변색|착색|color|colour|염료|과망간산|요오드/.test(text)) {
+      advice.push({ name:"색상 센서", reason:"관찰 가능한 색 변화가 있는 경우 보조 지표로 활용할 수 있습니다. 조명·농도·용기 색상에 영향을 받으며 색만으로 분해 여부를 확정할 수 없습니다." });
+    }
+    if (/빛|광분해|감광|photosens|light|peroxide|과산화수소|질산은|질산 은|agno3/.test(text)) {
+      advice.push({ name:"광센서", reason:"특정 파장의 흡수·투과 등 광학적 변화가 측정 목표일 때 검토할 수 있습니다. 파장과 측정 방식은 시약별 검증이 필요하며 분해 여부를 직접 확정하지는 못합니다." });
+    }
+    if (/빛|광분해|감광|차광|photosens|light|과산화수소|질산은|질산 은|agno3/.test(text)) {
+      advice.push({ name:"조도 센서", reason:"보관 공간의 주변 밝기와 빛 노출 환경을 기록하는 데 활용할 수 있습니다. 물질 자체의 광학적 변화가 아니라 주변 조도를 측정합니다." });
     }
     if (/전기화학|전극|이온|ph|산화환원|electrochem/.test(text)) {
       advice.push({ name:"전기화학 센서", reason:"전기화학적 측정이 적합할 가능성이 있습니다. 대상 물질, 매질, 농도 범위와 간섭을 검증해야 합니다." });
@@ -105,6 +114,41 @@
       <h4 style="margin-top:17px">입력한 보관 조건</h4><p>${esc(item.storage || "입력되지 않음 — 라벨 또는 SDS 확인 필요")}</p>
       </div>`;
   }
+  // Verified common-reagent lookup. Unknown names are never assigned a guessed formula.
+  const formulaLookup = new Map();
+  const formulaEntries = [
+    [["질산은","질산 은","silver nitrate","agno3"],"AgNO₃"],
+    [["염화나트륨","염화 나트륨","소금","sodium chloride","nacl"],"NaCl"],
+    [["황산","sulfuric acid","h2so4"],"H₂SO₄"],
+    [["수산화나트륨","수산화 나트륨","가성소다","sodium hydroxide","naoh"],"NaOH"],
+    [["염산","hydrochloric acid","hydrogen chloride","hcl"],"HCl"],
+    [["과산화수소","hydrogen peroxide","h2o2"],"H₂O₂"],
+    [["에탄올","ethanol","ethyl alcohol","c2h5oh"],"C₂H₅OH"],
+    [["아세트산","초산","acetic acid","ch3cooh"],"CH₃COOH"],
+    [["황산구리","황산 구리","황산구리(ii)","copper sulfate","cuso4"],"CuSO₄"],
+    [["질산칼륨","질산 칼륨","potassium nitrate","kno3"],"KNO₃"],
+    [["염화칼슘","염화 칼슘","calcium chloride","cacl2"],"CaCl₂"],
+    [["탄산수소나트륨","탄산수소 나트륨","베이킹소다","sodium bicarbonate","nahco3"],"NaHCO₃"],
+    [["포도당","glucose","c6h12o6"],"C₆H₁₂O₆"],
+    [["암모니아","ammonia","nh3"],"NH₃"]
+  ];
+  const normalizeName = value => value.toLowerCase().replace(/[\s_·-]/g, "").replace(/[()]/g, "");
+  formulaEntries.forEach(([names, formula]) => names.forEach(name => formulaLookup.set(normalizeName(name), formula)));
+  const reagentNameInput = $("reagentName"), formulaInput = $("formula");
+  if (reagentNameInput && formulaInput) {
+    reagentNameInput.addEventListener("input", () => {
+      const found = formulaLookup.get(normalizeName(reagentNameInput.value.trim()));
+      if (found) {
+        formulaInput.value = found;
+        formulaInput.dataset.autofilled = "true";
+      } else if (formulaInput.dataset.autofilled === "true") {
+        formulaInput.value = "";
+        delete formulaInput.dataset.autofilled;
+      }
+    });
+    formulaInput.addEventListener("input", () => { delete formulaInput.dataset.autofilled; });
+  }
+
   $("reagentForm").addEventListener("submit", event => {
     event.preventDefault();
     const item = {

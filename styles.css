@@ -79,3 +79,15 @@
 
 /* Reagent delete action */
 .button.danger{background:#b84242;color:#fff;border:1px solid #b84242}.button.danger:hover{background:#9f3434}.detail-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}.detail-actions>span{font-size:11px;color:var(--muted)}
+
+
+/* SENTRY requested feature additions — additive styles only */
+.field-hint{font-size:10px;font-weight:400;color:var(--muted);line-height:1.5}
+.sensor-guide-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:900px){.sensor-guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.sensor-guide-grid{grid-template-columns:1fr}}
+.state-good{color:#247A61}.state-bad{color:#B34D48}.state-unknown{color:#77869A}.unknown-text{color:#77869A}
+.state-source-note{font-size:10px;color:#8A98A9;background:#F1F4F8;border-radius:8px;padding:10px 12px;margin:10px 0 0}
+.lab-section{padding-top:52px}.lab-page-title{font-size:32px;letter-spacing:-.8px;margin:0 0 8px}.lab-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.lab-panel{padding:23px;min-width:0}.lab-panel-heading{display:flex;gap:12px;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid var(--line)}.lab-number{width:38px;height:38px;border-radius:11px;background:var(--blue-soft);color:var(--blue-dark);display:grid;place-items:center;font-size:12px;font-weight:800;flex-shrink:0}.lab-panel-heading h2{font-size:16px;margin:0 0 4px}.lab-panel-heading p{font-size:11px;color:var(--muted);margin:0}.lab-form{display:flex;flex-direction:column;gap:14px}.lab-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.lab-fields label{min-width:0}.lab-result{margin-top:16px;padding:15px;background:#F5F8FC;border:1px solid #E6EDF5;border-radius:11px;min-height:86px}.lab-result>p{font-size:11px;color:var(--muted);margin:0}.lab-result strong{display:block;font-size:25px;color:var(--blue-dark);margin:4px 0}.result-kicker{font-size:10px;color:var(--muted);font-weight:700}.lab-result p{font-size:11px;margin:5px 0;color:#596B80}.result-equation{font-size:11px;line-height:1.9;background:white;border-radius:8px;padding:10px;margin:10px 0;color:#40566F;overflow-wrap:anywhere}.lab-result small{font-size:10px;color:var(--muted);line-height:1.6;display:block}.lab-result .lab-error{color:#B34D48}.lab-caution{font-size:10px;color:#8A98A9;line-height:1.7;margin:12px 0 0}.procedure-list{padding-left:20px;margin:0}.procedure-list li{font-size:11px;color:#5E7085;line-height:1.8;padding:3px 0}.guide-panel .notice-box{margin-top:17px}
+@media(max-width:760px){.lab-grid{grid-template-columns:1fr}.lab-section{padding:38px 20px}.lab-panel{padding:18px}}
+@media(max-width:420px){.lab-fields{grid-template-columns:1fr}.lab-page-title{font-size:28px}}
