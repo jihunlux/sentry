@@ -8,40 +8,30 @@
   function all() { return window.SentryStore.list(); }
   function positionStates(x) {
     const pending = [x.sensorBound ? "수신 대기" : "센서 미연결", "unknown"];
-    if (!x.sensorBound || !x.sensorFresh) return { cabinet: pending, tilt: pending };
+    if (!x.sensorBound || !x.sensorFresh) return { cabinet: pending, tilt: pending, door: pending };
     const cabinet = x.irDetected === true ? ["용기 감지됨", "good"] :
       x.irDetected === false ? ["용기 미감지", "bad"] : ["정보 없음", "unknown"];
     const tilt = x.tiltStatus === "upright" ? ["정상적으로 서 있음", "good"] :
       x.tiltStatus === "tilted" ? ["기울어짐", "bad"] : ["정보 없음", "unknown"];
-    return { cabinet, tilt };
+    const door = x.open === true ? ["열림", "bad"] :
+      x.open === false ? ["닫힘", "good"] : ["정보 없음", "unknown"];
+    return { cabinet, tilt, door };
   }
-  const limits = [
-    { key: "monitorTempMin", label: "온도 하한 (°C)" },
-    { key: "monitorTempMax", label: "온도 상한 (°C)" },
-    { key: "monitorRhMin", label: "습도 하한 (%RH)", humidity: true },
-    { key: "monitorRhMax", label: "습도 상한 (%RH)", humidity: true }
-  ];
-  function number(value) {
-    if (typeof value === "string" && !value.trim()) return null;
-    if (typeof value !== "number" && typeof value !== "string") return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  function comparison(x, humidity) {
-    const value = number(humidity ? x.humidity : x.temp);
-    const lo = number(humidity ? x.monitorRhMin : x.monitorTempMin);
-    const hi = number(humidity ? x.monitorRhMax : x.monitorTempMax);
+  const TEMPERATURE_MIN = 1;
+  const TEMPERATURE_MAX = 30;
+  function temperatureState(x) {
     if (!x.sensorBound) return ["센서 미연결", "unknown", ""];
-    const reading = value === null ? "측정 오류" : value.toFixed(1) + (humidity ? "%RH" : "°C");
-    if (!x.sensorFresh) return [reading + " · 과거 측정", "unknown", ""];
-    if (value === null || (humidity && (value < 0 || value > 100))) return ["측정 오류", "bad", "측정 오류"];
-    if ((lo === null && hi === null) || (lo !== null && hi !== null && lo > hi) ||
-        (humidity && [lo, hi].some(v => v !== null && (v < 0 || v > 100)))) {
-      return [reading + " · 기준 미설정", "unknown", ""];
-    }
-    if (lo !== null && value < lo) return [reading + " · 하한 미만", "bad", "하한 미만 (" + reading + ")"];
-    if (hi !== null && value > hi) return [reading + " · 상한 초과", "bad", "상한 초과 (" + reading + ")"];
-    return [reading + " · 설정 범위 내", "good", ""];
+    const valid = Number.isFinite(x.temp);
+    const reading = valid ? x.temp.toFixed(1) + "°C" : "측정 오류";
+    if (!x.sensorFresh) return [valid ? reading + " · 과거 측정" : "수신 대기", "unknown", ""];
+    if (!valid) return ["측정 오류", "bad", "측정 오류"];
+    if (x.temp < TEMPERATURE_MIN) return [reading + " · 하한 미만", "bad", "하한 미만 (" + reading + ")"];
+    if (x.temp > TEMPERATURE_MAX) return [reading + " · 상한 초과", "bad", "상한 초과 (" + reading + ")"];
+    return [reading + " · 범위 내", "good", ""];
+  }
+  function humidityState(x) {
+    const value = x.sensorBound && x.sensorFresh && Number.isFinite(x.humidity) ? x.humidity : null;
+    return [value === null ? "—" : value.toFixed(1) + "%RH", "unknown"];
   }
   function reviewReasons(x) {
     if (!x.sensorBound || !x.sensorFresh) return [];
@@ -49,9 +39,8 @@
     if (x.open === true) reasons.push("개폐 센서 열림");
     if (x.irDetected === false) reasons.push("용기 미감지");
     if (x.tiltStatus === "tilted") reasons.push("용기 기울어짐");
-    const temp = comparison(x, false)[2], rh = comparison(x, true)[2];
-    if (temp) reasons.push("온도 " + temp);
-    if (rh) reasons.push("습도 " + rh);
+    const reason = temperatureState(x)[2];
+    if (reason) reasons.push("온도 " + reason);
     return reasons;
   }
   function needsReview(x) { return reviewReasons(x).length > 0; }
@@ -84,16 +73,16 @@
     const review = needsReview(x);
     const live = !!x.sensorBound;
     const liveNote = live ? (x.sensorFresh ? "실제 측정 · 수신 중" : "과거 측정 · 현재 상태 확인 불가") : "센서 미연결";
-    const temp = comparison(x, false), rh = comparison(x, true);
-    const { cabinet, tilt } = positionStates(x);
+    const temp = temperatureState(x), rh = humidityState(x);
+    const { cabinet, tilt, door } = positionStates(x);
     const stateField = (label, state, note) => `<div><small>${label}</small><b class="state-${state[1]}">${state[0]}</b><em class="${state[1] === "good" ? "good-text" : state[1] === "bad" ? "bad-text" : "unknown-text"}">${note}</em></div>`;
     element.innerHTML = `<div class="inline-detail-inner">
       <div class="detail-top"><div><h3>${esc(x.name)} <small>${esc(x.formula || "화학식 미입력")}</small></h3><span class="status-pill ${review ? "status-bad" : "status-good"}">${badgeText(x)}</span></div>
         <span class="simulated-label">● ${liveNote}</span></div>
       <div class="detail-grid-inner">
-        ${stateField("현재 온도", temp, liveNote)}
+        ${stateField("현재 온도", temp, liveNote + " · 대시보드 경보 범위 1~30°C")}
         ${stateField("현재 습도", rh, liveNote)}
-        ${stateField("개폐 센서 상태", x.sensorFresh && typeof x.open === "boolean" ? (x.open ? ["열림", "bad"] : ["닫힘", "good"]) : [liveNote, "unknown"], "센서 설치 대상 확인")}
+        ${stateField("개폐 센서 상태", door, liveNote)}
         <div><small>보관 위치</small><b>${esc(x.location || "미입력")}</b><em>${x.location ? "사용자가 입력한 위치" : "위치 입력 필요"}</em></div>
         ${stateField("보관함 감지 상태", cabinet, live ? "적외선 용기 감지" : liveNote)}
         ${stateField("용기 기울기", tilt, liveNote)}
@@ -135,7 +124,7 @@
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 2400);
   }
-  const editFields = ["name", "formula", "formType", "concentration", "storage", "location", "notes", ...limits.map(limit => limit.key)];
+  const editFields = ["name", "formula", "formType", "concentration", "storage", "location", "notes"];
   let editor = null;
   function openReagentEditor(id) {
     const item = all().find(x => String(x.id) === id);
@@ -167,9 +156,6 @@
     }
     const baseline = Object.fromEntries(editFields.map(key => [key, String(item[key] ?? "")]));
     const input = (key, label, wide = false) => `<label class="${wide ? "sentry-edit-wide" : ""}" for="sentryEdit-${key}">${label}<input id="sentryEdit-${key}" name="${key}" value="${esc(baseline[key])}" ${key === "name" ? "required" : ""}></label>`;
-    const referenceKey = String(item.name || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
-    const references = Object.hasOwn(window.SentryEnvironmentReferences || {}, referenceKey) ? window.SentryEnvironmentReferences[referenceKey] : [];
-    const referenceText = references.map(ref => [ref[0] && "온도 " + ref[0], ref[1] && "습도 " + ref[1]].filter(Boolean).join(" · ")).join(" / ");
     editor.innerHTML = `<form class="sentry-edit-form">
       <h3 id="sentryEditTitle">시약 정보 편집</h3>
       <p class="sentry-edit-intro">등록한 정보를 수정하고 저장하세요. 농도·순도는 기존 등록 형식과 동일하게 입력합니다.</p>
@@ -178,8 +164,6 @@
         <label for="sentryEdit-formType">물질 형태<select id="sentryEdit-formType" name="formType"><option value="">선택 안 함</option><option value="solid">고체</option><option value="liquid">액체·용액</option><option value="gas">기체</option><option value="unknown">모름</option></select></label>
         ${input("concentration", "농도·순도")}
         ${input("storage", "보관 조건", true)}${input("location", "보관 위치", true)}
-        <p class="sentry-edit-intro sentry-edit-wide"><strong>실시간 비교 기준</strong><br>해당 제품의 라벨·SDS로 확인한 기준만 입력하세요. 한쪽 한계만 입력할 수 있습니다. 아래 엑셀 참고값은 자동으로 적용되지 않습니다.${referenceText ? "<br>엑셀 참고 · " + esc(referenceText) : ""}</p>
-        ${limits.map(({ key, label, humidity }) => `<label for="sentryEdit-${key}">${label}<input id="sentryEdit-${key}" name="${key}" type="number" step="any" ${humidity ? 'min="0" max="100"' : ""} value="${esc(baseline[key])}"></label>`).join("")}
         <label class="sentry-edit-wide" for="sentryEdit-notes">용기·기타 메모<textarea id="sentryEdit-notes" name="notes" rows="3">${esc(baseline.notes)}</textarea></label>
       </div>
       <p class="sentry-edit-error" role="alert" aria-live="polite"></p>
@@ -198,14 +182,6 @@
       errorBox.textContent = "";
       const changes = Object.fromEntries(editFields.map(key => [key, form.elements.namedItem(key).value.trim()]));
       if (!changes.name) { errorBox.textContent = "시약 이름을 입력해 주세요."; form.elements.namedItem("name").focus(); return; }
-      for (const [low, high] of [[limits[0], limits[1]], [limits[2], limits[3]]]) {
-        const lo = number(changes[low.key]), hi = number(changes[high.key]);
-        if (lo !== null && hi !== null && lo > hi) {
-          errorBox.textContent = "하한은 상한보다 클 수 없습니다.";
-          form.elements.namedItem(low.key).focus();
-          return;
-        }
-      }
       try {
         const current = all().find(x => String(x.id) === id);
         if (!current) { errorBox.textContent = "이 시약이 삭제되었습니다. 취소 후 목록을 확인해 주세요."; return; }
@@ -242,9 +218,9 @@
     function reagentCard({x, reasons}) {
       const opened = selected === String(x.id);
       const form = x.formType === "solid" ? "고체" : x.formType === "liquid" ? "액체·용액" : x.formType === "gas" ? "기체" : "형태 확인";
-      const { cabinet, tilt } = positionStates(x);
-      const temp = comparison(x, false), rh = comparison(x, true);
-      return `<div class="reagent-wrap"><button class="reagent-item reagent-select ${opened ? "selected" : ""}" data-id="${esc(x.id)}" aria-expanded="${opened}" style="width:100%;text-align:left"><div><b>${esc(x.name)}</b><small>${esc(x.formula || "화학식 미입력")} · ${form} · ${esc(x.location || "보관 위치 미입력")}</small><span class="reagent-state-preview"><span class="reagent-state-chip state-${cabinet[1]}">보관함: ${cabinet[0]}</span><span class="reagent-state-chip state-${tilt[1]}">용기: ${tilt[0]}</span><span class="reagent-state-chip state-${temp[1]}">온도: ${temp[0]}</span><span class="reagent-state-chip state-${rh[1]}">습도: ${rh[0]}</span><span class="state-demo-tag">${x.sensorBound ? (x.sensorFresh ? "실제 측정" : "수신 지연 · 과거 측정") : "센서 미연결"}</span></span>${reasons.length ? `<small>${esc(reasons.join(" · "))}</small>` : ""}</div><span class="reagent-badge ${needsReview(x) ? "badge-bad" : x.sensorFresh ? "badge-good" : ""}">${badgeText(x)}</span><span class="expand-chevron">${opened ? "⌃" : "⌄"}</span></button><div class="inline-detail" data-detail="${esc(x.id)}" ${opened ? "" : "hidden"}></div></div>`;
+      const { cabinet, tilt, door } = positionStates(x);
+      const temp = temperatureState(x), rh = humidityState(x);
+      return `<div class="reagent-wrap"><button class="reagent-item reagent-select ${opened ? "selected" : ""}" data-id="${esc(x.id)}" aria-expanded="${opened}" style="width:100%;text-align:left"><div><b>${esc(x.name)}</b><small>${esc(x.formula || "화학식 미입력")} · ${form} · ${esc(x.location || "보관 위치 미입력")}</small><span class="reagent-state-preview"><span class="reagent-state-chip state-${cabinet[1]}">보관함: ${cabinet[0]}</span><span class="reagent-state-chip state-${tilt[1]}">용기: ${tilt[0]}</span><span class="reagent-state-chip state-${door[1]}">개폐: ${door[0]}</span><span class="reagent-state-chip state-${temp[1]}">온도: ${temp[0]}</span><span class="reagent-state-chip state-${rh[1]}">습도: ${rh[0]}</span><span class="state-demo-tag">${x.sensorBound ? (x.sensorFresh ? "실제 측정" : "수신 지연 · 과거 측정") : "센서 미연결"}</span></span>${reasons.length ? `<small>${esc(reasons.join(" · "))}</small>` : ""}</div><span class="reagent-badge ${needsReview(x) ? "badge-bad" : x.sensorFresh ? "badge-good" : ""}">${badgeText(x)}</span><span class="expand-chevron">${opened ? "⌃" : "⌄"}</span></button><div class="inline-detail" data-detail="${esc(x.id)}" ${opened ? "" : "hidden"}></div></div>`;
     }
     $("reagentList").innerHTML = matching.slice().reverse().map(reagentCard).join("") ||
       '<div class="empty-state"><b>표시할 시약이 없습니다</b><p>검색어와 확인이 필요한 시약 목록을 확인해 주세요.</p></div>';
