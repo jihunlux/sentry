@@ -22,14 +22,11 @@
   function manualNormal(x) {
     return !hasLiveSensor(x) && x.manualSimulationStatus === "normal";
   }
-  function registrationNeedsReview(x) {
-    return !x.formula || !x.formType || x.formType === "unknown" || !x.storage;
-  }
   function simulatedStates(x) {
     if (x.sensorBound && !x.sensorFresh) return { cabinet: "unknown", tilt: "unknown" };
     // Live readings may never be overridden or replaced by generated demo values.
     if (hasLiveSensor(x)) return {
-      cabinet: ["stored", "check"].includes(x.cabinetStatus) ? x.cabinetStatus : "unknown",
+      cabinet: x.sensorBound ? (x.irDetected === true ? "detected" : x.irDetected === false ? "missing" : "unknown") : "unknown",
       tilt: ["upright", "tilted"].includes(x.tiltStatus) ? x.tiltStatus : "unknown"
     };
     // A manual correction affects only demo indicators, never actual sensor values.
@@ -42,12 +39,50 @@
       stableHash(`tilt:${seed}`) % 5 === 0 ? "tilted" : "upright";
     return { cabinet, tilt };
   }
-  function needsReview(x) {
-    const sim = simulatedStates(x);
-    // An acknowledged simulated warning can be cleared, but missing registration
-    // information can never be silently marked as verified.
-    if (x.sensorBound) return registrationNeedsReview(x) || !x.sensorFresh || x.temp === null || x.humidity === null || x.open || x.tiltStatus === "tilted" || !x.irDetected;
-    return registrationNeedsReview(x) || (!manualNormal(x) && !!x.review) || sim.cabinet === "check" || sim.tilt === "tilted";
+  const limits = [
+    { key: "monitorTempMin", label: "온도 하한 (°C)" },
+    { key: "monitorTempMax", label: "온도 상한 (°C)" },
+    { key: "monitorRhMin", label: "습도 하한 (%RH)", humidity: true },
+    { key: "monitorRhMax", label: "습도 상한 (%RH)", humidity: true }
+  ];
+  function number(value) {
+    if (typeof value === "string" && !value.trim()) return null;
+    if (typeof value !== "number" && typeof value !== "string") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  function comparison(x, humidity) {
+    const value = number(humidity ? x.humidity : x.temp);
+    const lo = number(humidity ? x.monitorRhMin : x.monitorTempMin);
+    const hi = number(humidity ? x.monitorRhMax : x.monitorTempMax);
+    if (!x.sensorBound) return ["센서 미연결", "unknown", ""];
+    const reading = value === null ? "측정 오류" : value.toFixed(1) + (humidity ? "%RH" : "°C");
+    if (!x.sensorFresh) return [reading + " · 과거 측정", "unknown", ""];
+    if (value === null || (humidity && (value < 0 || value > 100))) return ["측정 오류", "bad", "측정 오류"];
+    if ((lo === null && hi === null) || (lo !== null && hi !== null && lo > hi) ||
+        (humidity && [lo, hi].some(v => v !== null && (v < 0 || v > 100)))) {
+      return [reading + " · 기준 미설정", "unknown", ""];
+    }
+    if (lo !== null && value < lo) return [reading + " · 하한 미만", "bad", "하한 미만 (" + reading + ")"];
+    if (hi !== null && value > hi) return [reading + " · 상한 초과", "bad", "상한 초과 (" + reading + ")"];
+    return [reading + " · 설정 범위 내", "good", ""];
+  }
+  function reviewReasons(x) {
+    if (!x.sensorBound || !x.sensorFresh) return [];
+    const reasons = [];
+    if (x.open === true) reasons.push("개폐 센서 열림");
+    if (x.irDetected === false) reasons.push("용기 미감지");
+    if (x.tiltStatus === "tilted") reasons.push("용기 기울어짐");
+    const temp = comparison(x, false)[2], rh = comparison(x, true)[2];
+    if (temp) reasons.push("온도 " + temp);
+    if (rh) reasons.push("습도 " + rh);
+    return reasons;
+  }
+  function needsReview(x) { return reviewReasons(x).length > 0; }
+  function badgeText(x) {
+    if (needsReview(x)) return "확인 필요";
+    if (!x.sensorBound) return "센서 미연결";
+    return x.sensorFresh ? "감지된 이상 없음" : "수신 대기 · 과거 측정";
   }
   function sensorInfo(x) {
     const text = `${x.name || ""} ${x.formula || ""} ${x.notes || ""}`.toLowerCase();
@@ -68,6 +103,8 @@
   }
   function statusLabel(value, type) {
     if (type === "cabinet") {
+      if (value === "detected") return ["용기 감지됨", "good"];
+      if (value === "missing") return ["용기 미감지", "bad"];
       return value === "stored" ? ["정상 보관", "good"] : value === "check" ? ["확인 필요", "bad"] : ["정보 없음", "unknown"];
     }
     return value === "upright" ? ["정상적으로 서 있음", "good"] : value === "tilted" ? ["기울어짐", "bad"] : ["정보 없음", "unknown"];
@@ -93,7 +130,7 @@
     const editable = !hasLiveSensor(x);
     const stateField = (label, state, note) => `<div><small>${label}</small><b class="state-${state[1]}">${state[0]}</b><em class="${state[1] === "good" ? "good-text" : state[1] === "bad" ? "bad-text" : "unknown-text"}">${note}</em></div>`;
     element.innerHTML = `<div class="inline-detail-inner">
-      <div class="detail-top"><div><h3>${esc(x.name)} <small>${esc(x.formula || "화학식 미입력")}</small></h3><span class="status-pill ${review ? "status-bad" : "status-good"}">${review ? "정보 확인 필요" : userNormal ? "정상 보관 · 사용자 설정" : "정보 입력됨"}</span></div>
+      <div class="detail-top"><div><h3>${esc(x.name)} <small>${esc(x.formula || "화학식 미입력")}</small></h3><span class="status-pill ${review ? "status-bad" : "status-good"}">${badgeText(x)}</span></div>
         <span class="simulated-label">● 보관함·기울기: ${live ? liveNote : hasLiveSensor(x) ? "연동 데이터 · 장치 검증 필요" : userNormal ? "사용자가 설정한 시뮬레이션 정상 상태" : "시뮬레이션 · 실제 측정 아님"}</span></div>
       <div class="detail-grid-inner">
         <div><small>현재 온도</small><b>${measure(x.temp, 1, "°C")}</b><em class="unknown-text">${readingNote}</em></div>
@@ -107,7 +144,7 @@
       </div>
       ${live ? `<p class="state-source-note">마지막 수신: ${esc(new Date(x.receivedAt).toLocaleString("ko-KR"))} · 적외선: ${x.irDetected ? "용기 감지됨" : "용기 감지되지 않음"} · 부저: ${x.buzzer ? "켜짐" : "꺼짐"}. ${liveNote}. 시약 안전성 판정과는 별개입니다.</p>` : ""}
       <p class="state-source-note">${hasLiveSensor(x) ? "연동 장치 데이터의 정상 여부는 시스템 및 실제 보관 상황에서 확인해야 합니다. " : userNormal ? "보관함 위치·기울기(및 시연용 개폐 상태)를 사용자가 정상으로 변경했습니다. " : "보관함 위치와 용기 기울기는 시약별로 고정해 둔 시연용 임의 상태입니다. "}${live ? "센서값은 실제 수신 데이터이며 보관 안전성 판정은 아닙니다." : "이는 실제 센서에서 확인한 결과나 안전 판정이 아닙니다."} ${live ? "온도·습도·개폐·기울기·적외선은 연결된 장치의 마지막 수신값입니다. 지정 보관함 위치는 확인하지 않습니다." : demo ? "온도·습도도 시뮬레이션 예시이며 변경하지 않습니다." : "온도·습도는 센서 미연결로 측정값이 없습니다."} 제품 라벨과 SDS 확인은 별도로 필요합니다.</p>
-      ${editable ? `<div class="demo-state-control"><div><strong>보관 상태 수동 변경</strong><small>시뮬레이션에만 적용되며 실제 센서 경고·등록 정보 오류는 변경하지 않습니다.</small></div><button type="button" class="button ${userNormal ? "secondary" : "primary"} small" data-set-normal="${userNormal ? "restore" : "normal"}">${userNormal ? "이전 시뮬레이션 상태로 복원" : "정상 보관으로 변경"}</button></div>` : `<p class="state-source-note">실제 센서 데이터는 이 화면에서 정상으로 변경할 수 없습니다.</p>`}
+      ${editable ? `<div class="demo-state-control"><div><strong>보관 상태 수동 변경</strong><small>시뮬레이션 표시만 변경합니다.</small></div><button type="button" class="button ${userNormal ? "secondary" : "primary"} small" data-set-normal="${userNormal ? "restore" : "normal"}">${userNormal ? "이전 시뮬레이션 상태로 복원" : "정상 보관으로 변경"}</button></div>` : `<p class="state-source-note">실제 센서 데이터는 이 화면에서 정상으로 변경할 수 없습니다.</p>`}
       <h4 class="detail-subtitle">추가 센서 정보</h4><div class="optional-detail-list">${sensorInfo(x).map(o => `<div class="optional-detail"><b>${esc(o[0])}</b><span>${esc(o[1])}</span><small>${esc(o[2])}</small></div>`).join("")}</div>
       <div class="notice-box"><span>ⓘ</span><p>${esc(x.notes || "추가 메모 없음")} 실제 보관·취급 전에 제품 라벨과 SDS를 확인하세요.</p></div>
       <div class="detail-actions"><button type="button" class="button secondary small" data-edit>시약 정보 편집</button><button type="button" class="button danger small" data-delete>시약 삭제</button></div>
@@ -143,7 +180,7 @@
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 2400);
   }
-  const editFields = ["name", "formula", "formType", "concentration", "storage", "location", "notes"];
+  const editFields = ["name", "formula", "formType", "concentration", "storage", "location", "notes", ...limits.map(limit => limit.key)];
   let editor = null;
   function openReagentEditor(id) {
     const item = all().find(x => String(x.id) === id);
@@ -175,6 +212,9 @@
     }
     const baseline = Object.fromEntries(editFields.map(key => [key, String(item[key] ?? "")]));
     const input = (key, label, wide = false) => `<label class="${wide ? "sentry-edit-wide" : ""}" for="sentryEdit-${key}">${label}<input id="sentryEdit-${key}" name="${key}" value="${esc(baseline[key])}" ${key === "name" ? "required" : ""}></label>`;
+    const referenceKey = String(item.name || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+    const references = Object.hasOwn(window.SentryEnvironmentReferences || {}, referenceKey) ? window.SentryEnvironmentReferences[referenceKey] : [];
+    const referenceText = references.map(ref => [ref[0] && "온도 " + ref[0], ref[1] && "습도 " + ref[1]].filter(Boolean).join(" · ")).join(" / ");
     editor.innerHTML = `<form class="sentry-edit-form">
       <h3 id="sentryEditTitle">시약 정보 편집</h3>
       <p class="sentry-edit-intro">등록한 정보를 수정하고 저장하세요. 농도·순도는 기존 등록 형식과 동일하게 입력합니다.</p>
@@ -183,6 +223,8 @@
         <label for="sentryEdit-formType">물질 형태<select id="sentryEdit-formType" name="formType"><option value="">선택 안 함</option><option value="solid">고체</option><option value="liquid">액체·용액</option><option value="gas">기체</option><option value="unknown">모름</option></select></label>
         ${input("concentration", "농도·순도")}
         ${input("storage", "보관 조건", true)}${input("location", "보관 위치", true)}
+        <p class="sentry-edit-intro sentry-edit-wide"><strong>실시간 비교 기준</strong><br>해당 제품의 라벨·SDS로 확인한 기준만 입력하세요. 한쪽 한계만 입력할 수 있습니다. 아래 엑셀 참고값은 자동으로 적용되지 않습니다.${referenceText ? "<br>엑셀 참고 · " + esc(referenceText) : ""}</p>
+        ${limits.map(({ key, label, humidity }) => `<label for="sentryEdit-${key}">${label}<input id="sentryEdit-${key}" name="${key}" type="number" step="any" ${humidity ? 'min="0" max="100"' : ""} value="${esc(baseline[key])}"></label>`).join("")}
         <label class="sentry-edit-wide" for="sentryEdit-notes">용기·기타 메모<textarea id="sentryEdit-notes" name="notes" rows="3">${esc(baseline.notes)}</textarea></label>
       </div>
       <p class="sentry-edit-error" role="alert" aria-live="polite"></p>
@@ -201,6 +243,14 @@
       errorBox.textContent = "";
       const changes = Object.fromEntries(editFields.map(key => [key, form.elements.namedItem(key).value.trim()]));
       if (!changes.name) { errorBox.textContent = "시약 이름을 입력해 주세요."; form.elements.namedItem("name").focus(); return; }
+      for (const [low, high] of [[limits[0], limits[1]], [limits[2], limits[3]]]) {
+        const lo = number(changes[low.key]), hi = number(changes[high.key]);
+        if (lo !== null && hi !== null && lo > hi) {
+          errorBox.textContent = "하한은 상한보다 클 수 없습니다.";
+          form.elements.namedItem(low.key).focus();
+          return;
+        }
+      }
       try {
         const current = all().find(x => String(x.id) === id);
         if (!current) { errorBox.textContent = "이 시약이 삭제되었습니다. 취소 후 목록을 확인해 주세요."; return; }
@@ -249,10 +299,11 @@
   }
   function render() {
     const items = all().map(x => window.SentryStore.overlay(x)).map(x => window.SentrySerial ? window.SentrySerial.overlay(x) : x);
+    const flagged = items.map(x => ({x, reasons: reviewReasons(x)})).filter(({reasons}) => reasons.length);
     const q = $("searchReagents").value.toLowerCase().trim();
     const matching = items.filter(x => `${x.name || ""} ${x.formula || ""}`.toLowerCase().includes(q));
     $("totalReagents").textContent = items.length;
-    $("needsReview").textContent = items.filter(needsReview).length;
+    $("needsReview").textContent = flagged.length;
     $("reagentList").innerHTML = matching.length ? matching.slice().reverse().map(x => {
       const opened = selected === String(x.id);
       const form = x.formType === "solid" ? "고체" : x.formType === "liquid" ? "액체·용액" : x.formType === "gas" ? "기체" : "형태 확인";
@@ -260,28 +311,12 @@
       const cabinet = statusLabel(sim.cabinet, "cabinet");
       const tilt = statusLabel(sim.tilt, "tilt");
       const userNormal = manualNormal(x);
-      return `<div class="reagent-wrap"><button class="reagent-item reagent-select ${opened ? "selected" : ""}" data-id="${esc(x.id)}" aria-expanded="${opened}" style="width:100%;text-align:left"><div><b>${esc(x.name)}</b><small>${esc(x.formula || "화학식 미입력")} · ${form} · ${esc(x.location || "보관 위치 미입력")}</small><span class="reagent-state-preview"><span class="reagent-state-chip state-${cabinet[1]}">보관함: ${cabinet[0]}</span><span class="reagent-state-chip state-${tilt[1]}">용기: ${tilt[0]}</span><span class="state-demo-tag">${x.sensorBound ? (x.sensorFresh ? "실제 측정" : "수신 지연 · 과거 측정") : hasLiveSensor(x) ? "장치 연동 데이터" : userNormal ? "사용자 설정 · 시뮬레이션" : "시뮬레이션"}</span></span></div><span class="reagent-badge ${needsReview(x) ? "badge-bad" : "badge-good"}">${needsReview(x) ? "확인 필요" : userNormal ? "정상 보관" : "정보 입력됨"}</span><span class="expand-chevron">${opened ? "⌃" : "⌄"}</span></button><div class="inline-detail" data-detail="${esc(x.id)}" ${opened ? "" : "hidden"}></div></div>`;
+      const temp = comparison(x, false), rh = comparison(x, true);
+      return `<div class="reagent-wrap"><button class="reagent-item reagent-select ${opened ? "selected" : ""}" data-id="${esc(x.id)}" aria-expanded="${opened}" style="width:100%;text-align:left"><div><b>${esc(x.name)}</b><small>${esc(x.formula || "화학식 미입력")} · ${form} · ${esc(x.location || "보관 위치 미입력")}</small><span class="reagent-state-preview"><span class="reagent-state-chip state-${cabinet[1]}">보관함: ${cabinet[0]}</span><span class="reagent-state-chip state-${tilt[1]}">용기: ${tilt[0]}</span><span class="reagent-state-chip state-${temp[1]}">온도: ${temp[0]}</span><span class="reagent-state-chip state-${rh[1]}">습도: ${rh[0]}</span><span class="state-demo-tag">${x.sensorBound ? (x.sensorFresh ? "실제 측정" : "수신 지연 · 과거 측정") : hasLiveSensor(x) ? "장치 연동 데이터" : userNormal ? "사용자 설정 · 시뮬레이션" : "시뮬레이션"}</span></span></div><span class="reagent-badge ${needsReview(x) ? "badge-bad" : x.sensorFresh ? "badge-good" : ""}">${badgeText(x)}</span><span class="expand-chevron">${opened ? "⌃" : "⌄"}</span></button><div class="inline-detail" data-detail="${esc(x.id)}" ${opened ? "" : "hidden"}></div></div>`;
     }).join("") : '<div class="empty-state"><b>표시할 시약이 없습니다</b><p>시약 등록 메뉴에서 내 시약을 추가하거나 검색어를 확인해 주세요.</p></div>';
-    $("reviewList").innerHTML = items.filter(needsReview).map(x => {
-      const sim = simulatedStates(x);
-      const reasons = [];
-      if (x.sensorBound) {
-        if (!x.sensorFresh) reasons.push("수신 지연 또는 연결 끊김");
-        if (x.temp === null || x.humidity === null) reasons.push("온습도 측정 오류");
-        if (x.open) reasons.push("개폐 센서 열림");
-        if (x.tiltStatus === "tilted") reasons.push("용기 기울어짐(마지막 측정)");
-        if (!x.irDetected) reasons.push("용기 감지되지 않음(마지막 측정)");
-      }
-      if (!x.sensorBound && sim.cabinet === "check") reasons.push("보관함 확인 필요(시뮬레이션)");
-      if (!x.sensorBound && sim.tilt === "tilted") reasons.push("용기 기울어짐(시뮬레이션)");
-      if (!x.sensorBound && !manualNormal(x) && !!x.review) reasons.push("기존 확인 플래그(시뮬레이션)");
-      if (registrationNeedsReview(x)) reasons.push("등록 정보·SDS 검토");
-      const canCorrect = !hasLiveSensor(x) && !manualNormal(x) && (sim.cabinet === "check" || sim.tilt === "tilted" || x.review);
-      return `<div class="review-item"><span class="review-dot"></span><div><b>${esc(x.name)}</b><p>${esc(reasons.join(" · "))}</p>${canCorrect ? `<button type="button" class="demo-fix-button" data-review-normal="${esc(x.id)}">정상 보관으로 변경</button>` : ""}</div></div>`;
-    }).join("") || '<div class="empty-state compact"><b>확인할 항목이 없습니다</b></div>';
-    document.querySelectorAll("[data-review-normal]").forEach(button => button.addEventListener("click", () => {
-      updateManualState(String(button.dataset.reviewNormal), "normal");
-    }));
+    $("reviewList").innerHTML = flagged.map(({x, reasons}) =>
+      `<div class="review-item"><span class="review-dot"></span><div><b>${esc(x.name)}</b><p>${esc(reasons.join(" · "))}</p></div></div>`
+    ).join("") || '<div class="empty-state compact"><b>실시간 측정에서 감지된 이상이 없습니다</b></div>';
     document.querySelectorAll(".reagent-select").forEach(button => button.addEventListener("click", () => {
       selected = selected === button.dataset.id ? null : button.dataset.id;
       render();
