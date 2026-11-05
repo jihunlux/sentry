@@ -1,6 +1,5 @@
 (() => {
   "use strict";
-  const STORAGE_KEY = "sentry-reagents-v1";
   const slides = [
     { title: '시약의 보관 환경을<br><span>더 체계적으로</span> 관리하다', description: '시약별 보관 조건과 센서 정보를 한곳에서 확인하고, 필요한 관리 항목을 놓치지 않도록 도와줍니다.' },
     { title: '시약마다 다른 조건을<br><span>맞춤형으로</span> 확인하다', description: '입력한 시약 정보를 바탕으로 확인해야 할 항목과 추가 센서 후보를 살펴보세요.' },
@@ -43,14 +42,7 @@
   const nav = document.querySelector(".top-nav"); nav.id = "topNav";
   nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => nav.classList.remove("open")));
 
-  function loadReagents() {
-    try { const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); return Array.isArray(value) ? value : []; }
-    catch { return []; }
-  }
-  function saveReagents(items) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); return true; }
-    catch { showToast("브라우저 저장에 실패했습니다. 저장 공간 또는 브라우저 설정을 확인해 주세요."); return false; }
-  }
+  function loadReagents() { return window.SentryStore.list(); }
   function getReviewReasons(item) {
     const reasons = [];
     if (!item.formula.trim()) reasons.push("분자식 또는 화학식이 입력되지 않았습니다.");
@@ -149,7 +141,7 @@
     formulaInput.addEventListener("input", () => { delete formulaInput.dataset.autofilled; });
   }
 
-  $("reagentForm").addEventListener("submit", event => {
+  $("reagentForm").addEventListener("submit", async event => {
     event.preventDefault();
     const item = {
       id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
@@ -159,11 +151,15 @@
       createdAt: new Date().toISOString(), lastOpened: null
     };
     if (!item.name) { showToast("시약 이름을 입력해 주세요."); return; }
-    const items = loadReagents(); items.push(item);
-    if (!saveReagents(items)) return;
+    const submit = event.target.querySelector('button[type="submit"]');
+    if (submit.disabled) return;
+    submit.disabled = true;
+    try { await window.SentryStore.add(item); }
+    catch (error) { showToast(error.message); return; }
+    finally { submit.disabled = false; }
     if ($("totalReagents")) renderDashboard(); renderAnalysis(item);
     event.target.reset();
-    showToast("시약이 등록되었습니다. 분석 결과는 입력 정보 기반의 참고 안내입니다.");
+    showToast("내 계정에 시약이 등록되었습니다. 분석 결과는 입력 정보 기반의 참고 안내입니다.");
   });
   if ($("totalReagents")) renderDashboard();
   if ($("prevSlide")) restartSlideTimer();

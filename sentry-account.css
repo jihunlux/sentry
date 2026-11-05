@@ -1,0 +1,40 @@
+/* Account UI follows SENTRY's existing colours, cards and spacing. */
+body[data-sentry-private]:not(.account-ready) main { display:none; }
+.account-gate { max-width:650px; margin:65px auto; padding:26px; border:1px solid var(--line); border-radius:14px; background:white; text-align:center; line-height:1.8; }
+.account-gate .button { margin:8px; }
+.top-nav a { white-space:nowrap; }
+.account-logout { border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:white; color:var(--muted); font:inherit; cursor:pointer; white-space:nowrap; }
+.account-login { padding:9px 17px; border:1px solid var(--line); border-radius:9px; color:var(--blue-dark); background:#fff; }
+.account-shell { max-width:1040px; margin:auto; min-height:calc(100vh - 83px); padding:70px 24px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); align-items:center; gap:80px; }
+.account-copy h1 { font-size:39px; line-height:1.45; letter-spacing:-1.3px; margin:13px 0 20px; }
+.account-copy > p { color:var(--muted); max-width:390px; line-height:1.9; }
+.account-copy h1 span { color:var(--blue); }
+.account-feature { display:flex; gap:11px; align-items:center; color:var(--muted); font-size:12px; margin-top:18px; }
+.account-feature > span { display:grid; place-items:center; background:var(--blue-soft); color:var(--blue-dark); border-radius:9px; width:30px; height:30px; }
+.account-card { padding:30px; background:white; border:1px solid var(--line); border-radius:17px; box-shadow:0 12px 45px #334D7009; min-width:0; }
+.account-card h2 { margin:0 0 7px; font-size:24px; letter-spacing:-.5px; }
+.account-card > p { color:var(--muted); font-size:12px; margin:0 0 23px; line-height:1.7; }
+.account-form { display:flex; flex-direction:column; gap:16px; }
+.account-form label { display:flex; flex-direction:column; gap:7px; font-size:12px; font-weight:700; }
+.account-form input { width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:9px; background:#F8FAFD; color:var(--text); font:inherit; font-weight:400; }
+.account-form input:focus-visible { outline:2px solid #A8C2E4; outline-offset:2px; }
+.account-form .button { width:100%; margin-top:3px; }
+.account-form :disabled { opacity:.6; cursor:wait; }
+.account-message { font-size:12px; padding:12px; margin:0 0 18px; border-radius:8px; background:#F2F5F9; line-height:1.8; overflow-wrap:anywhere; }
+.account-message[hidden] { display:none; }
+.account-message.is-error { background:#FCEBE9; color:#A3423D; }
+.account-message.is-success { background:#E4F5EE; color:#247A61; }
+.account-links { margin-top:20px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; color:var(--muted); font-size:12px; }
+.account-links a { color:var(--blue-dark); text-decoration:underline; text-underline-offset:3px; }
+.account-help { font-size:11px; line-height:1.8; color:var(--muted); margin-top:20px; }
+.account-bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:10px; background:#fff; padding:13px 16px; margin-bottom:22px; font-size:12px; }
+.account-bar > span { overflow-wrap:anywhere; min-width:0; }
+.account-bar small { color:var(--muted); }
+.account-bar-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.account-data-message { color:var(--muted); font-size:12px; line-height:1.8; }
+.account-import { margin:20px 0; padding:15px; border:1px solid var(--line); border-radius:10px; font-size:12px; }
+.account-import p { color:var(--muted); line-height:1.8; }
+.account-setup main { max-width:680px; margin:40px auto; padding:24px; }
+.account-setup .account-card { padding:28px; }
+@media(max-width:1000px) { .account-shell { gap:35px; } .top-nav { gap:19px; } }
+@media(max-width:760px) { .account-shell { grid-template-columns:1fr; max-width:520px; padding:35px 20px; gap:28px; } .account-copy h1 { font-size:30px; margin:8px 0 12px; } .account-copy > p { margin:0; font-size:12px; } .account-feature { display:none; } .account-card { padding:24px; } }

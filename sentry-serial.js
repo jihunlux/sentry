@@ -1,4 +1,4 @@
-/* Browser-local HC-06 receiver. No network upload, no changes to saved reagent data. */
+/* HC-06 receiver. Latest real readings are saved separately under the signed-in account. */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -8,13 +8,7 @@
   const fresh = () => Boolean(active && snapshot && Date.now() - snapshot.receivedAt <= 30000);
   const emit = () => window.dispatchEvent(new Event("sentry-sensor-update"));
   const tell = text => { $("serialStatus").textContent = text; };
-  function records() {
-    try {
-      const raw = localStorage.getItem("sentry-reagents-v1");
-      const value = raw === null ? window.SENTRY_DEMOS || [] : JSON.parse(raw);
-      return Array.isArray(value) ? value.filter(x => x && typeof x === "object") : [];
-    } catch (_) { return window.SENTRY_DEMOS || []; }
-  }
+  function records() { return window.SentryStore.list(); }
   function refreshOptions() {
     const previous = target.value;
     const items = records();
@@ -47,10 +41,20 @@
     if (active) tell(!snapshot ? "연결됨 · 첫 측정 묶음을 기다립니다. 최대 15초 기다려 주세요." : current ? "수신 중 · 아두이노에서 약 10초마다 갱신합니다." : "30초 이상 새 측정값이 없습니다. 전원·배선·통신 속도를 확인하세요.");
     if (current !== lastFresh) { lastFresh = current; emit(); }
   }
+  let saveQueue = Promise.resolve();
   const parser = new window.SentryProtocol.FrameParser((data, raw) => {
     snapshot = { ...data, receivedAt: Date.now() };
     $("serialRaw").textContent = raw;
     paint(); emit();
+    const owner = window.SentryAuth.user?.id, reagent = boundId, reading = { ...snapshot };
+    saveQueue = saveQueue.catch(() => {}).then(async () => {
+      if (!owner || window.SentryAuth.user?.id !== owner) return;
+      $("serialSaveStatus").textContent = "최신 측정값을 계정에 저장하는 중입니다…";
+      try {
+        await window.SentryStore.saveReading(reagent, reading);
+        if (window.SentryAuth.user?.id === owner) $("serialSaveStatus").textContent = "계정에 최신 측정값을 저장했습니다.";
+      } catch (error) { if (window.SentryAuth.user?.id === owner) $("serialSaveStatus").textContent = error.message; }
+    });
   });
   window.SentrySerial = {
     overlay(item) {
@@ -96,6 +100,9 @@
   target.addEventListener("change", () => {
     snapshot = null; boundId = ""; paint(); emit(); updateControls();
     $("serialRaw").textContent = "아직 수신하지 않음";
+  });
+  window.addEventListener("sentry-account-changing", () => {
+    snapshot = null; boundId = ""; parser.reset(); disconnect(); paint();
   });
   connectButton.addEventListener("click", connect);
   stopButton.addEventListener("click", disconnect);

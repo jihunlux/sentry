@@ -1,23 +1,11 @@
-/* SENTRY dashboard: retains original localStorage key, samples, search, delete and advice. */
+/* SENTRY dashboard: account-scoped cloud data, search, editing, delete and sensor advice. */
 (() => {
   "use strict";
-  const K = "sentry-reagents-v1";
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-  const demos = window.SENTRY_DEMOS || [];
   let selected = null;
 
-  function all() {
-    try {
-      const raw = localStorage.getItem(K);
-      if (raw === null) return demos.map(d => ({ ...d }));
-      const value = JSON.parse(raw);
-      // A deliberately empty saved list must stay empty; never re-seed on every visit.
-      return Array.isArray(value) ? value.filter(x => x && typeof x === "object") : [];
-    } catch (_) {
-      return demos.map(d => ({ ...d }));
-    }
-  }
+  function all() { return window.SentryStore.list(); }
   // Repeatable pseudo-random demo statuses are calculated in memory from each reagent ID.
   // This NEVER changes the user's saved reagent data and never represents a real sensor reading.
   function stableHash(value) {
@@ -131,11 +119,11 @@
     const del = element.querySelector("[data-delete]");
     const setNormal = element.querySelector("[data-set-normal]");
     if (setNormal) setNormal.onclick = () => updateManualState(String(x.id), setNormal.dataset.setNormal);
-    if (del) del.onclick = () => {
+    if (del) del.onclick = async () => {
       if (!confirm(`'${x.name}' 시약을 삭제할까요?`)) return;
       try {
-        const updated = all().filter(item => String(item.id) !== String(x.id));
-        localStorage.setItem(K, JSON.stringify(updated));
+        del.disabled = true;
+        await window.SentryStore.remove(String(x.id));
         selected = null;
         window.dispatchEvent(new Event("sentry-reagents-changed"));
         render();
@@ -145,7 +133,7 @@
           toast.classList.add("show");
           setTimeout(() => toast.classList.remove("show"), 2400);
         }
-      } catch (_) { alert("브라우저 저장에 실패했습니다. 삭제가 적용되지 않았습니다."); }
+      } catch (error) { del.disabled = false; alert(error.message); }
     };
   }
   function notify(message) {
@@ -208,25 +196,22 @@
       const detailElement = [...document.querySelectorAll("[data-detail]")].find(el => el.dataset.detail === id);
       detailElement?.querySelector("[data-edit]")?.focus({ preventScroll: true });
     };
-    form.onsubmit = event => {
+    form.onsubmit = async event => {
       event.preventDefault();
       errorBox.textContent = "";
       const changes = Object.fromEntries(editFields.map(key => [key, form.elements.namedItem(key).value.trim()]));
       if (!changes.name) { errorBox.textContent = "시약 이름을 입력해 주세요."; form.elements.namedItem("name").focus(); return; }
       try {
-        // Read the latest saved array, never save sensor overlays or stale list copies.
-        const raw = localStorage.getItem(K);
-        const items = raw === null ? demos.map(x => ({ ...x })) : JSON.parse(raw);
-        if (!Array.isArray(items)) throw new Error("invalid-storage");
-        const current = items.find(x => x && String(x.id) === id);
-        if (!current) { errorBox.textContent = "이 시약이 다른 창에서 삭제되었습니다. 취소 후 목록을 확인해 주세요."; return; }
+        const current = all().find(x => String(x.id) === id);
+        if (!current) { errorBox.textContent = "이 시약이 삭제되었습니다. 취소 후 목록을 확인해 주세요."; return; }
         if (editFields.some(key => String(current[key] ?? "") !== baseline[key])) {
-          errorBox.textContent = "다른 창에서 이 시약 정보가 변경되었습니다. 취소한 뒤 다시 편집해 주세요."; return;
+          errorBox.textContent = "시약 정보가 변경되었습니다. 취소한 뒤 다시 편집해 주세요."; return;
         }
-        Object.assign(current, changes);
-        localStorage.setItem(K, JSON.stringify(items));
-      } catch (_) {
-        errorBox.textContent = "브라우저에 저장하지 못했습니다. 입력 내용은 유지됩니다. 저장 공간과 브라우저 설정을 확인해 주세요."; return;
+        form.querySelectorAll("button,input,select,textarea").forEach(el => el.disabled = true);
+        await window.SentryStore.update(id, changes);
+      } catch (error) {
+        form.querySelectorAll("button,input,select,textarea").forEach(el => el.disabled = false);
+        errorBox.textContent = error.message; return;
       }
       selected = id;
       const q = $("searchReagents").value.toLowerCase().trim();
@@ -240,10 +225,10 @@
     form.elements.namedItem("name").focus();
   }
 
-  function updateManualState(id, action) {
+  async function updateManualState(id, action) {
     const data = all();
     const reagent = data.find(item => String(item.id) === id);
-    if (!reagent || hasLiveSensor(reagent)) {
+    if (!reagent || hasLiveSensor(window.SentryStore.overlay(reagent))) {
       alert("실제 센서 데이터는 변경할 수 없습니다.");
       return;
     }
@@ -254,16 +239,16 @@
       delete reagent.manualSimulationStatus;
     } else return;
     try {
-      localStorage.setItem(K, JSON.stringify(data));
+      await window.SentryStore.update(id, { manualSimulationStatus: action === "normal" ? "normal" : null });
       selected = id;
       render();
       notify(action === "normal" ? "시뮬레이션 보관 상태를 정상으로 변경했습니다." : "이전 시뮬레이션 상태로 복원했습니다.");
-    } catch (_) {
-      alert("브라우저 저장에 실패했습니다. 상태가 변경되지 않았습니다.");
+    } catch (error) {
+      alert(error.message);
     }
   }
   function render() {
-    const items = all().map(x => window.SentrySerial ? window.SentrySerial.overlay(x) : x);
+    const items = all().map(x => window.SentryStore.overlay(x)).map(x => window.SentrySerial ? window.SentrySerial.overlay(x) : x);
     const q = $("searchReagents").value.toLowerCase().trim();
     const matching = items.filter(x => `${x.name || ""} ${x.formula || ""}`.toLowerCase().includes(q));
     $("totalReagents").textContent = items.length;
@@ -276,7 +261,7 @@
       const tilt = statusLabel(sim.tilt, "tilt");
       const userNormal = manualNormal(x);
       return `<div class="reagent-wrap"><button class="reagent-item reagent-select ${opened ? "selected" : ""}" data-id="${esc(x.id)}" aria-expanded="${opened}" style="width:100%;text-align:left"><div><b>${esc(x.name)}</b><small>${esc(x.formula || "화학식 미입력")} · ${form} · ${esc(x.location || "보관 위치 미입력")}</small><span class="reagent-state-preview"><span class="reagent-state-chip state-${cabinet[1]}">보관함: ${cabinet[0]}</span><span class="reagent-state-chip state-${tilt[1]}">용기: ${tilt[0]}</span><span class="state-demo-tag">${x.sensorBound ? (x.sensorFresh ? "실제 측정" : "수신 지연 · 과거 측정") : hasLiveSensor(x) ? "장치 연동 데이터" : userNormal ? "사용자 설정 · 시뮬레이션" : "시뮬레이션"}</span></span></div><span class="reagent-badge ${needsReview(x) ? "badge-bad" : "badge-good"}">${needsReview(x) ? "확인 필요" : userNormal ? "정상 보관" : "정보 입력됨"}</span><span class="expand-chevron">${opened ? "⌃" : "⌄"}</span></button><div class="inline-detail" data-detail="${esc(x.id)}" ${opened ? "" : "hidden"}></div></div>`;
-    }).join("") : '<div class="empty-state"><b>검색 결과가 없습니다</b><p>검색어를 바꾸거나 시약 등록 메뉴에서 추가해 주세요.</p></div>';
+    }).join("") : '<div class="empty-state"><b>표시할 시약이 없습니다</b><p>시약 등록 메뉴에서 내 시약을 추가하거나 검색어를 확인해 주세요.</p></div>';
     $("reviewList").innerHTML = items.filter(needsReview).map(x => {
       const sim = simulatedStates(x);
       const reasons = [];
@@ -312,6 +297,15 @@
   const menu = $("mobileMenu"), nav = $("topNav");
   if (menu && nav) menu.addEventListener("click", () => nav.classList.toggle("open"));
   window.addEventListener("sentry-sensor-update", render);
+  window.addEventListener("sentry-reagents-changed", render);
+  window.addEventListener("sentry-account-changing", () => { if (editor?.open) editor.close(); if (editor) editor.innerHTML = ""; });
+  $("refreshAccountData").addEventListener("click", async () => {
+    const button = $("refreshAccountData"); button.disabled = true;
+    $("accountDataMessage").textContent = "계정 데이터를 불러오는 중입니다…";
+    try { await window.SentryStore.load(); render(); $("accountDataMessage").textContent = "최신 계정 데이터를 불러왔습니다. 저장된 센서값은 마지막 측정 기록입니다."; }
+    catch (error) { $("accountDataMessage").textContent = error.message; }
+    finally { button.disabled = false; }
+  });
   render();
 })();
 
