@@ -122,7 +122,7 @@
       ${editable ? `<div class="demo-state-control"><div><strong>보관 상태 수동 변경</strong><small>시뮬레이션에만 적용되며 실제 센서 경고·등록 정보 오류는 변경하지 않습니다.</small></div><button type="button" class="button ${userNormal ? "secondary" : "primary"} small" data-set-normal="${userNormal ? "restore" : "normal"}">${userNormal ? "이전 시뮬레이션 상태로 복원" : "정상 보관으로 변경"}</button></div>` : `<p class="state-source-note">실제 센서 데이터는 이 화면에서 정상으로 변경할 수 없습니다.</p>`}
       <h4 class="detail-subtitle">추가 센서 정보</h4><div class="optional-detail-list">${sensorInfo(x).map(o => `<div class="optional-detail"><b>${esc(o[0])}</b><span>${esc(o[1])}</span><small>${esc(o[2])}</small></div>`).join("")}</div>
       <div class="notice-box"><span>ⓘ</span><p>${esc(x.notes || "추가 메모 없음")} 실제 보관·취급 전에 제품 라벨과 SDS를 확인하세요.</p></div>
-      <div class="detail-actions"><button type="button" class="button secondary small" data-edit>시약 정보 편집</button><button type="button" class="button danger small" data-delete>시약 삭제</button><span>삭제한 시약은 현재 브라우저에서 제거됩니다.</span></div>
+      <div class="detail-actions"><button type="button" class="button secondary small" data-edit>시약 정보 편집</button><button type="button" class="button danger small" data-delete>시약 삭제</button></div>
       </div>`;
     element.classList.add("expanded");
     element.hidden = false;
@@ -314,4 +314,5 @@
   window.addEventListener("sentry-sensor-update", render);
   render();
 })();
+
 
