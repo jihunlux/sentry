@@ -30,8 +30,8 @@
     return [reading + " · 범위 내", "good", ""];
   }
   function humidityState(x) {
-    const value = x.sensorBound && x.sensorFresh && Number.isFinite(x.humidity) ? x.humidity : null;
-    return [value === null ? "—" : value.toFixed(1) + "%RH", "unknown"];
+    if (!x.sensorBound || !Number.isFinite(x.humidity)) return ["—", "unknown"];
+    return [x.humidity.toFixed(1) + "%RH" + (x.sensorFresh ? "" : " · 과거 측정"), "unknown"];
   }
   function reviewReasons(x) {
     if (!x.sensorBound || !x.sensorFresh) return [];

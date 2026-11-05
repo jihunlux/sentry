@@ -30,7 +30,8 @@
     $("serialTime").textContent = snapshot ? new Date(snapshot.receivedAt).toLocaleString("ko-KR") : "아직 수신하지 않음";
     if (snapshot) {
       $("serialTemp").textContent = snapshot.temp === null ? "측정 오류" : `${snapshot.temp.toFixed(1)} °C`;
-      $("serialHumidity").textContent = current && Number.isFinite(snapshot.humidity) ? `${snapshot.humidity.toFixed(1)} %RH` : "—";
+      $("serialHumidity").textContent = Number.isFinite(snapshot.humidity)
+        ? `${snapshot.humidity.toFixed(1)} %RH${current ? "" : " · 과거 측정"}` : "—";
       $("serialDoor").textContent = snapshot.open ? "열림" : "닫힘";
       $("serialTilt").textContent = snapshot.tiltStatus === "tilted" ? "기울어짐" : "정상적으로 서 있음";
       $("serialIR").textContent = snapshot.irDetected ? "용기 감지됨" : "용기 감지되지 않음";
