@@ -1,146 +1,216 @@
-/* SENTRY 시약 한글/영문 이름 -> 화학식 자동 완성
- * 데이터: 제공된 <화학실 시약리스트_2025.08.pdf> 중 화학식이 확인 가능한 항목과
- *        원본 자료의 오탈자/누락을 점검한 일반 명칭.
- * 기존 register.html, app.js, 저장 데이터 및 CSS는 수정하지 않습니다.
- * 이 파일만 기존 sentry-formula.js에 덮어써도 작동합니다.
+/* SENTRY 시약 자동 완성: 학교 시약목록 PDF 우선, 기존 한/영 사전 유지.
+ * 변경: 화학식 PDF 원문 우선 (예: 주석판 = Sn foil), 대분류-소분류 코드 자동 입력,
+ * 학교 재고표에 제품별 농도/순도가 명시된 경우만 자동 입력 / 제품 선택.
+ * 다른 페이지, 저장 시약 데이터 및 스타일은 변경하지 않음.
  */
 (() => {
   "use strict";
   const input = document.getElementById('reagentName');
-  const output = document.getElementById('formula');
-  if (!input || !output) return;
-
+  const formula = document.getElementById('formula');
+  const location = document.getElementById('location');
+  const concentration = document.getElementById('concentration');
+  if (!input || !formula) return;
   const reagentRows = [["비스무트","Bismuth","Bi"],["카드뮴","Cadmium","Cd"],["칼슘","Calcium","Ca"],["규소","Silicon","Si"],["적인","Phosphrous red","P"],["숯","Charcoal","C"],["탄소봉","Carbon rod","C"],["산화칼슘","Calcium oxide","CaO"],["이산화망가니즈","Manganese(IV) oxide","MnO2"],["산화아연","Zinc oxide","ZnO"],["일산화납","Lead(II) oxide","PbO"],["이산화납","Lead(IV) oxide","PbO2"],["과산화나트륨","Sodium peroxide","Na2O2"],["과산화바륨","Barium peroxide","BaO2"],["산화알루미늄","Aluminium oxide","Al2O3"],["산화타이타늄","Titanium dioxide","TiO2"],["산화규소","Silicon oxide","SiO2"],["산화은","silver(I) oxide","Ag2O"],["리튬 텅스텐 산화물","Lithium tungsten oxide","Li2WO4"],["염화나트륨","Sodium chloride","NaCl"],["염화암모늄","Ammonium chloride","NH4Cl"],["염화칼슘","Calcium chloride","CaCl2"],["염화아연","Zinc chloride","ZnCl2"],["염화칼륨","Potassium chloride","KCl"],["염화마그네슘","Magnesium chloride","MgCl2"],["염화스트론튬","Strontium chloride","SrCl2"],["염화바륨","Barium chloride","BaCl2"],["염화리튬","Lithium chloride","LiCl"],["차아염소산나트륨","Sodium hypochlorite","NaClO"],["염화구리","Copper(II) chloride","CuCl2"],["염화니켈","Nickel(II) chloride","NiCl2"],["과염수산칼륨","Potassium perchlorate","KClO4"],["리튬 과염소산","Lithium perchlorate","LiClO4"],["황산니켈","Nickel(II) sulfate","NiSO4"],["황산칼슘","Calcium sulfate","CaSO4"],["황산아연","Zinc sulfate","ZnSO4"],["황산알루미늄","Aluminum sulfate","Al2(SO4)3"],["황산암모늄","Ammonium sulfate","(NH4)2SO4"],["황산바륨","Barium sulfate","BaSO4"],["황산마그네슘","Magnesium sulfate","MgSO4"],["황산나트륨","Sodium sulfate","Na2SO4"],["아황산나트륨","Sodium sulfite","Na2SO3"],["아황산수소나트륨","Sodium hydrogen sulfite","NaHSO3"],["싸이오황산나트륨","Sodium thiosulfate","Na2S2O3"],["암모늄명반","Ammonium alum","(NH4)Al(SO4)2"],["황산은","Silver(I) sulfate","Ag2SO4"],["황산납","Lead sulfate","PbSO4"],["황산망가니즈","Manganese Sulfate","MnSO4"],["과황산암모늄","Ammonium Persulfate","(NH4)2S2O8"],["다이아황산나트륨","SODIUM METABISULFIT","Na2S2O5"],["황산칼륨","potassium sulfate","K2SO4"],["아황산수소칼륨","Potassium hydrogen sul","KHSO3"],["질산칼륨","Potassium nitrate","KNO3"],["질산스트론튬","Strontium nitrate","Sr(NO3)2"],["질산바륨","Barium nitrate","Ba(NO3)2"],["질산나트륨","Sodium nitrate","NaNO3"],["질산암모늄","Ammonium nitrate","NH4NO3"],["질산은","Silver nitrate","AgNO3"],["질산납","Lead nitrate","Pb(NO3)2"],["질산구리","Copper(II) nitrate","Cu(NO3)2"],["질산아연","Zinc nitrate","Zn(NO3)2"],["질산알루미늄","Aluminum nitrate","Al(NO3)3"],["질산니켈","Nickel(II) nitrate","Ni(NO3)2"],["질산마그네슘","Magnesium nitrate","Mg(NO3)2"],["질산크로뮴","Chromium(III) nitrate","Cr(NO3)3"],["질산세륨암모늄","Ceric ammonium nitrate","CeH8N8O18"],["질산코발트","Cobalt(II) Nitrate","Co(NO3)2"],["질산비스무스","Bismuth(III) nitrate","Bi(NO3)3"],["질산칼슘","Calcium nitrate","Ca(NO3)2"],["아질산 나트륨","Sodium nitrite","NaNO2"],["탄산나트륨","Sodium carbonate","Na2CO3"],["탄산수소나트륨","Sodium Bicarbonate","NaHCO3"],["탄산칼슘","Calcium carbonate","CaCO3"],["탄산칼륨","Potassium carbonate","K2CO3"],["탄산암모늄","Ammonium carbonate","(NH4)2CO3"],["탄산납","Lead(II) carbonate","PbCO3"],["탄산마그네슘","Magnesium carbonate","MgCO3"],["탄산리튬","Lithium carbonate","Li2CO3"],["탄산수소칼륨","Potassium bicarbonate","KHCO3"],["탄산구리","Copper (II) carbonate","CuCO3"],["황화나트륨","Sodium sulfide","Na2S"],["황화안티모니","Antimony trisulfide","Sb2S3"],["황화수은","Mercury sulfide","HgS"],["황화아연","Zinc sulfide","ZnS"],["붕산","Boric acid","H3BO3"],["과망가니즈산칼륨","Potassium permangana","KMnO4"],["싸이오시안산칼륨","Potassium thiocyanate","KSCN"],["브로민화칼륨","Potassium bromide","KBr"],["규산나트륨","Sodium silicate","Na2SiO3"],["아이오딘산칼륨","Potassium iodate","KIO3"],["수소화붕소나트륨","Sodium borohydride","NaBH4"],["아이오딘화칼륨","Potassium iodide","KI"],["아이오딘화나트륨","Sodium iodide","NaI"],["브로민화나트륨","Sodium bromide","NaBr"],["인산나트륨","Sodium Phosphate","Na3PO4"],["염소산칼륨","Potassium chlorate","KClO3"],["아자이드화나트륨","Sodium azide","NaN3"],["바나듐산암모늄","Ammonium vanadate(V)","NH4VO3"],["염소산나트륨","sodium chlorate","NaClO3"],["몰리브덴산나트륨","Sodium Molybdate","Na2MoO4"],["플루오린화 나트륨","Sodium Fluoride","NaF"],["크롬산칼륨","Potassium chromate","K2CrO4"],["티오시안산나트륨","Sodium thiocyanate","NaSCN"],["삼폴리인산나트륨","Sodium tripolyphosp","Na5P3O10"],["티오시안산칼륨","Potassium thiocyanate","KSCN"],["아이오딘화 구리","copper(I) iodide","CuI"],["포도당","Glucose","C6H12O6"],["설탕","Sucrose","C12H22O11"],["젖당","Lactose","C12H22O11"],["덱스트린","Dextrin","(C6H10O5)n"],["과당","Fructose","C6H12O6"],["셀룰로오스","Cellulose","(C6H10O5)n"],["덱스트로오스","Dextrose","C6H12O6"],["아드레날린","adrenaline","C9H13NO3"],["글리콜산","Glycolic acid","C2H4O3"],["타타르산","Tartaric acid","C4H6O6"],["폼산","Formic acid","HCOOH"],["옥살산","Oxalic acid","C2H2O4"],["구연산(시트르산)","Citric acid","C6H8O7"],["살리실산","Salicylic acid","C7H6O3"],["피크린산","Picric acid","C6H3N3O7"],["벤조산","Benzoic acid","C7H6O2"],["타타르산철암모늄","Ammonium iron tartrate","C8H12FeNO12"],["구연산나트륨","Sodium citrate","C6H5Na3O7"],["스테아르산","Stearic acid","C18H36O2"],["아세트산나트륨","Sodium acetate","C2H3NaO2"],["옥살산나트륨","Sodium oxalate","Na2C2O4"],["EDTA","Ethylenediaminetetraacetic acid","C10H16N2O8"],["스테아르산칼슘","Calcium stearate","C36H70CaO4"],["올레산","Oleic acid","C18H34O2"],["옥살산칼슘","Calcium oxalate","CaC2O4"],["아스코브산","Ascorbic acid","C6H8O6"],["아스파테임","Aspartame","C14H18N2O5"],["벤조산나트륨","Sodium benzoate","C7H5NaO2"],["말론산","Malonic acid","C3H4O4"],["키틴","Chitin","(C8H13O5N)n"],["설파닐산","Sulfanilic acid","C6H7NO3S"],["팔미트산","palmitic acid","C16H32O2"],["말레산","Maleic acid","C4H4O4"],["폴리아크릴산나트륨","Sodium Polyacrylate","(C3H3NaO2)n"],["젖산칼슘","Calcium Lactate","C6H10CaO6"],["아세트산칼슘","Calcium acetate","Ca(C2H3O2)2"],["프탈산수소칼륨","Potassium hydrogen phthalate","C8H5KO4"],["나이트로벤젠","Nitrobenzene","C6H5NO2"],["플루오레세인","Fluorescein","C20H12O5"],["리보플라빈","riboflavin","C17H20N4O6"],["나프탈렌","Naphthalene","C10H8"],["글리세롤(린)","Glycerol(Glycerin)","C3H8O3"],["요소","Urea","CO(NH2)2"],["알긴산나트륨","Sodium alginate","C6H9NaO7"],["캄파","Camphor","C10H16O"],["카보머(증점제)","Carbomer","(C3H4O2)n"],["카페인","Caffeine","C8H10N4O2"],["닌하이드린","Ninhydrin","C9H6O4"],["티모프탈레인","Thymolphthalein","C28H30O4"],["소비톨","Sorbitol","C6H14O6"],["레조시놀","Resorcinol(Benzene-1,3","C6H6O2"],["콜레스테롤","cholesterol","C27H46O"],["파라-니트로아닐린","p-Nitroaniline","C6H6N2O2"],["아세트아미노펜","Acetaminophen","C8H9NO2"],["안트라센","Anthracene","C14H10"],["메틸파라벤","Methylparaben","C8H8O3"],["알파-토코페롤","alpha-Tocopherol","C29H50O2"],["2-메틸이미다졸","2-Methylimidazole","C4H6N2"],["칼마지트","Calmagite","C17H14N2O5S"],["이부프로펜","Ibuprofen","C13H18O2"],["아세트아닐리드","acetanilide","C8H9NO"],["메틸렌블루","Methylene blue","C16H18ClN3S"],["샤프라닌","Safranin","C20H19ClN4"],["알리자린","Alizarin","C14H8O4"],["티오닌","Thionin","C12H10ClN3S"],["크리스탈 바이올렛","Crystal Violet","C25N3H30Cl"],["페놀프탈레인","Phenolphthalein","C20H14O4"],["다이페닐아민","Diphenylamine","C12H11N"],["PTC","Phenylthiocarbamide","C7H8N2S"],["루미놀","Luminol","C8H7N3O2"],["HEPES","2-[4-(2-hydroxyethyl)pi","C8H18N2O4S"],["벤조피렌","Benzopyrene","C20H12"],["메틸레드","Methyl red","C15H15N3O2"],["뮤렉사이드","Murexide","C8H8N6O6"],["티몰블루","Thymol blue","C27H30O5S"],["증류수","Distilled water","H2O"],["수산화나트륨","Sodium hydroxide","NaOH"],["수산화칼슘","Calcium hydroxide","Ca(OH)2"],["수산화칼륨","Potassium hydroxide","KOH"],["수산화바륨","Barium hydroxide","Ba(OH)2"],["수산화알루미늄","Aluminum hydroxide","Al(OH)3"],["염산","Hydrochloric acid","HCl"],["황산","Sulfuric acid","H2SO4"],["질산","Nitric acid","HNO3"],["인산","Phosphoric acid","H3PO4"],["플루오린화수소산","Hydrofluoric acid","HF"],["메타인산","Metaphosphoric acid","HPO3"],["설파민산","Sulfamic acid","H2NSO3H"],["메틸알코올","Methyl alcohol","CH3OH"],["에틸알코올","Ethyl alcohol","C2H5OH"],["다이에틸에터","Ethyl ether","C2H5OC2H5"],["뷰틸알코올","Butyl alcohol","C4H9OH"],["아이소펜틸알코올","Isopentyl alcohol","C5H11OH"],["옥틸알코올","Octyl alcohol","C8H17OH"],["프로필알코올","Propyl alcohol","C3H8O"],["벤젠","Benzene","C6H6"],["헥세인","Hexane","C6H14"],["아세톤","Acetone","(CH3)2CO"],["톨루엔","Toluene","C7H8"],["피리딘","Pyridine","C5H5N"],["사염화탄소","Carbon tetrachloride","CCl4"],["메틸피롤리돈","Methyl pyrrolidone","C5H9NO"],["무수아세트산","Acetic anhydride","C4H6O3"],["염화메틸렌","Dichloromethane","CH2Cl2"],["헥사메틸렌다이아민","Hexamethylenediamine","C6H16N2"],["클로로폼","Chloroform","CHCl3"],["다이메틸아닐린","N,N-Dimethylaniline","C8H11N"],["염화아디포일","Adipoyl chloride","C6H8Cl2O2"],["페놀","Phenol","C6H6O"],["크레졸","Cresol","C7H8O"],["트라이에탄올아민","Triethanolamine","C6H15NO3"],["아세트알데하이드","Acetaldehyde","C2H4O"],["에탈렌다이아민","Ethylenediamine","C2H8N2"],["아닐린","Aniline","C6H7N"],["아세트산에틸","Ethyl acetate","C4H8O2"],["사이클로헥산올","Cyclohexanol","C6H12O"],["아세트산뷰틸","Butyl acetate","C6H12O2"],["아이소프로판올","Isopropanol","(CH3)2CHOH"],["테트라하이드로퓨란","Tetrahydrofuran","C4H8O"],["아밀알코올","Amyl alcohol","C5H12O"],["벤질알코올","Benzyl alcohol","C7H8O"],["프로필렌글라이콜","Propylene glycol","C3H8O2"],["아세틸아세톤","Acetylacetone","C5H8O2"],["메틸에틸케톤","Methyl ethyl ketone","C4H8O"],["트라이메틸펜테인","Trimethylpentane","C8H18"],["아크릴산에틸","Ethyl acrylate","C5H8O2"],["아크릴산메틸","Methyl acrylate","C4H6O2"],["뷰틸아민","Butylamine","C4H11N"],["세탄올(세틸알코올)","Cetyl alcohol","C16H34O"],["벤즈알데하이드","Benzaldehyde","C7H6O"],["4-아미노페놀","4-aminophenol","C6H7NO"],["자일렌","xylene","C8H10"],["아세트아마이드","acetamide","CH3CONH2"],["다이메틸폼아마이드","Dimethylformamide","C3H7NO"],["과산화수소","Hydrogen peroxide","H2O2"],["폼알데하이드","Form aldehyde","CH2O"],["아이오딘","Iodine","I2"],["리튬","Lithium","Li"],["나트륨","Sodium","Na"],["칼륨","Potassium","K"],["수은","Mercury","Hg"],["비스무트산나트륨","Sodium bismuthate","NaBiO3"],["아세트산납","Lead(II) acetate","(CH3COO)2Pb"],["다이크로뮴산칼륨","Potassium dichromate","K2Cr2O7"],["다이크로뮴산암모늄","Ammonium dichoromat","(NH4)2Cr2O7"],["칼슘카바이드","Calcium carbide","CaC2"],["질산카드뮴","Cadmium nitrate","Cd(NO3)2"],["티타늄 테트라이소프로폭사이드","Titanium(IV) isopropoxide","Ti[OCH(CH3)2]4"],["다이아황산나트륨","SODIUM METABISULFITE","Na2S2O5"],["질산철","Iron(III) nitrate","Fe(NO3)3"],["붕사","Borax","B4O7Na2·10H2O"],["과망가니즈산칼륨","Potassium permanganate","KMnO4"],["제1인산칼륨","Potassium Phosphate Monobasic","KH2PO4"],["제2인산 나트륨","Disodium Hydrogen Phosphate (Sodium phosphate)","Na2HPO4"],["다이나이트로살리실산","3,5-Dinitrosalicylic acid","C7H4N2O7"],["6,8-노나데카다이노익산","6,8-Nonadecadiynoic acid","C19H30O2"],["석신산","succinic acid","(CH2)2(CO2H)2"],["아세틸살리실산 (아스피린)","acetylsalicylic acid","C9H8O4"],["하이드로퀴논","Hydroquinone(Benzene-1,4-diol)","C6H6O2"],["레조시놀","Resorcinol(Benzene-1,3-diol)","C6H6O2"],["인디고카민","Indigo carmine","C16H8N2Na2O8S2"],["메틸오렌지","Methyl orange","C14H14N3NaO3S"],["BTB","Bromothymol blue","C27H28Br2O5S"],["HEPES","2-[4-(2-hydroxyethyl)piperazin-1-yl]ethane-1-sulfonic a","C8H18N2O4S"],["메틸알코올 (메탄올)","Methyl alcohol","CH3OH"],["뷰틸알코올 (부탄올)","Butyl alcohol","C4H9OH"],["다이메틸아세트아마이드","Dimethylacetamide","C4H9NO"],["아이소뷰틸 메틸케톤","Methyl isobutyl ketone","C6H12O"],["마그네슘 리본","Magnesium ribbon","Mg"],["마그네슘 가루","Magnesium powder","Mg"],["알루미늄 판","Aluminum foil","Al"],["알루미늄 가루","Aluminum powder","Al"],["아연판","Zinc foil","Zn"],["아연 가루","Zinc powder","Zn"],["철판","Iron foil","Fe"],["철가루","Iron powder","Fe"],["니켈판","Nickel foil","Ni"],["주석판","Tin foil","Sn"],["납판","Lead foil","Pb"],["납가루","Lead powder","Pb"],["구리판","Copper foil","Cu"],["구리가루","Copper powder","Cu"],["은판","Silver foil","Ag"],["백금선","Platinum wire","Pt"],["황 분말","Sulfur powder","S"],["붕사","Borax","Na2B4O7·10H2O"],["에오신Y","Eosin Y","C20H6Br4Na2O5"],["에리오크롬 블랙T","Eriochrome Black T","C20H12N3NaO7S"],["아세틸살리실산","Acetylsalicylic acid","C9H8O4"],["염화코발트(Ⅱ) 육수화물","Cobalt(II) chloride hexahydrate","CoCl2·6H2O"],["황산구리(II)","Copper(II) sulfate","CuSO4"],["타타르산칼륨나트륨 사수화물","Potassium sodium tartrate tetrahydrate","KNaC4H4O6·4H2O"],["헥사시아노철(Ⅱ)산칼륨","Potassium hexacyanoferrate(II)","K4[Fe(CN)6]"],["헥사시아노철(Ⅲ)산칼륨","Potassium hexacyanoferrate(III)","K3[Fe(CN)6]"],["염화구리(II)","Copper(II) chloride","CuCl2"],["염화코발트(II) 육수화물","Cobalt(II) chloride hexahydrate","CoCl2·6H2O"],["브로민산칼륨","Potassium bromate","KBrO3"],["헥사시아노철(II)산칼륨","Potassium hexacyanoferrate(II)","K4[Fe(CN)6]"],["헥사시아노철(III)산칼륨","Potassium hexacyanoferrate(III)","K3[Fe(CN)6]"],["인산이수소칼륨","Potassium dihydrogen phosphate","KH2PO4"],["인산수소이칼륨","Dipotassium hydrogen phosphate","K2HPO4"],["황산철(II)암모늄","Ammonium iron(II) sulfate","(NH4)2Fe(SO4)2"],["탄산수소암모늄","Ammonium bicarbonate","NH4HCO3"],["부티르산","Butyric acid","C4H8O2"],["석신산","Succinic acid","C4H6O4"],["타타르산칼륨","Dipotassium tartrate","K2C4H4O6"],["아밀 아세테이트","Amyl acetate","CH3COOC5H11"],["아세트산프로필","Propyl acetate","C5H10O2"],["메탄올","Methanol","CH3OH"],["에탄올","Ethanol","C2H5OH"],["에터","Diethyl ether","C2H5OC2H5"],["글리세롤","Glycerol","C3H8O3"],["아스코르브산","Ascorbic acid","C6H8O6"],["시트르산","Citric acid","C6H8O7"],["암모니아","Ammonia","NH3"],["브로모타이몰블루","Bromothymol blue","C27H28Br2O5S"],["소르비톨","Sorbitol","C6H14O6"],["크리스탈바이올렛","Crystal violet","C25H30ClN3"],["활성탄","Activated carbon","C"],["명반","Potassium aluminum sulfate","KAl(SO4)2"],["크로뮴명반","Potassium chromium sulfate","KCr(SO4)2"],["몰리브덴산암모늄","Ammonium molybdate","(NH4)2MoO4"]];
   const aliases = {"소금":"NaCl","table salt":"NaCl","baking soda":"NaHCO3","베이킹소다":"NaHCO3","가성소다":"NaOH","caustic soda":"NaOH","초산":"CH3COOH","acetic acid":"CH3COOH","ethanoic acid":"CH3COOH","isopropyl alcohol":"(CH3)2CHOH","IPA":"(CH3)2CHOH","isopropanol":"(CH3)2CHOH","메틸알코올":"CH3OH","methyl alcohol":"CH3OH","에틸알코올":"C2H5OH","ethyl alcohol":"C2H5OH","구연산":"C6H8O7","비타민C":"C6H8O6","vitamin C":"C6H8O6","과망간산칼륨":"KMnO4","염화 소듐":"NaCl","sodium bicarbonate":"NaHCO3","황산구리":"CuSO4","황산구리(II)":"CuSO4","copper sulfate":"CuSO4","copper(II) sulfate":"CuSO4","silver nitrate":"AgNO3","ammonia":"NH3","물":"H2O","water":"H2O","염화코발트육수화물":"CoCl2·6H2O","potassium dihydrogen phosphate":"KH2PO4","monopotassium phosphate":"KH2PO4","dipotassium phosphate":"K2HPO4","ferric chloride":"FeCl3","ferrous chloride":"FeCl2","sodium hydroxide":"NaOH","질산은":"AgNO3"};
   const forced = {"질산은":"AgNO3","황산구리ii":"CuSO4","염화코발트ii육수화물":"CoCl2·6H2O","브로민산칼륨":"KBrO3","붕사":"Na2B4O7·10H2O","과망가니즈산칼륨":"KMnO4","타타르산칼륨나트륨사수화물":"KNaC4H4O6·4H2O","헥사시아노철ii산칼륨":"K4[Fe(CN)6]","헥사시아노철iii산칼륨":"K3[Fe(CN)6]","인산이수소칼륨":"KH2PO4","인산수소이칼륨":"K2HPO4","염화구리ii":"CuCl2","황산철ii암모늄":"(NH4)2Fe(SO4)2","탄산수소암모늄":"NH4HCO3","부티르산":"C4H8O2","석신산":"C4H6O4","타타르산칼륨":"K2C4H4O6","아밀아세테이트":"CH3COOC5H11","아세트산프로필":"C5H10O2","아세트산에틸":"C4H8O2","메탄올":"CH3OH","에탄올":"C2H5OH","에터":"C2H5OC2H5","다이에틸에터":"C2H5OC2H5","글리세롤":"C3H8O3","과산화수소":"H2O2","아스코르브산":"C6H8O6","시트르산":"C6H8O7","포도당":"C6H12O6","염화나트륨":"NaCl","염산":"HCl","황산":"H2SO4","수산화나트륨":"NaOH","암모니아":"NH3","증류수":"H2O","브로모타이몰블루":"C27H28Br2O5S","btb":"C27H28Br2O5S","메틸오렌지":"C14H14N3NaO3S","인디고카민":"C16H8N2Na2O8S2","에오신y":"C20H6Br4Na2O5","에리오크롬블랙t":"C20H12N3NaO7S","아세틸살리실산":"C9H8O4","소르비톨":"C6H14O6","메틸에틸케톤":"C4H8O","크리스탈바이올렛":"C25H30ClN3","활성탄":"C","명반":"KAl(SO4)2","크로뮴명반":"KCr(SO4)2","몰리브덴산암모늄":"(NH4)2MoO4","silvernitrate":"AgNO3","copperiisulfate":"CuSO4","cobaltiichloridehexahydrate":"CoCl2·6H2O","potassiumbromate":"KBrO3","borax":"Na2B4O7·10H2O","potassiumpermanganate":"KMnO4","potassiumsodiumtartratetetrahydrate":"KNaC4H4O6·4H2O","potassiumhexacyanoferrateii":"K4[Fe(CN)6]","potassiumhexacyanoferrateiii":"K3[Fe(CN)6]","potassiumdihydrogenphosphate":"KH2PO4","dipotassiumhydrogenphosphate":"K2HPO4","copperiichloride":"CuCl2","ammoniumironiisulfate":"(NH4)2Fe(SO4)2","ammoniumbicarbonate":"NH4HCO3","butyricacid":"C4H8O2","succinicacid":"C4H6O4","dipotassiumtartrate":"K2C4H4O6","amylacetate":"CH3COOC5H11","propylacetate":"C5H10O2","ethylacetate":"C4H8O2","methanol":"CH3OH","ethanol":"C2H5OH","diethylether":"C2H5OC2H5","ethylether":"C2H5OC2H5","glycerol":"C3H8O3","hydrogenperoxide":"H2O2","ascorbicacid":"C6H8O6","citricacid":"C6H8O7","glucose":"C6H12O6","sodiumchloride":"NaCl","hydrochloricacid":"HCl","sulfuricacid":"H2SO4","sodiumhydroxide":"NaOH","ammonia":"NH3","distilledwater":"H2O","bromothymolblue":"C27H28Br2O5S","methylorange":"C14H14N3NaO3S","indigocarmine":"C16H8N2Na2O8S2","eosiny":"C20H6Br4Na2O5","eriochromeblackt":"C20H12N3NaO7S","acetylsalicylicacid":"C9H8O4","sorbitol":"C6H14O6","methylethylketone":"C4H8O","crystalviolet":"C25H30ClN3","activatedcarbon":"C","potassiumaluminumsulfate":"KAl(SO4)2","potassiumchromiumsulfate":"KCr(SO4)2","ammoniummolybdate":"(NH4)2MoO4"};
+  const schoolRows = [["마그네슘 리본","Magnesium ribbon","Mg ribbon","10-11","무기물 · 금속"],["마그네슘 가루","Magnesium powder","Mg powder","10-11","무기물 · 금속"],["알루미늄 판","Aluminum foil","Al foil","10-11","무기물 · 금속"],["알루미늄 가루","Aluminum powder","Al powder","10-11","무기물 · 금속"],["아연판","Zinc foil","Zn foil","10-11","무기물 · 금속"],["아연 가루","Zinc powder","Zn powder","10-11","무기물 · 금속"],["철판","Iron foil","Fe foil","10-11","무기물 · 금속"],["철가루","Iron powder","Fe powder","10-11","무기물 · 금속"],["니켈판","Nickel foil","Ni foil","10-11","무기물 · 금속"],["주석판","Tin foil","Sn foil","10-11","무기물 · 금속"],["납판","Lead foil","Pb foil","10-11","무기물 · 금속"],["납가루","Lead powder","Pb powder","10-11","무기물 · 금속"],["구리판","Cupper foil","Cu foil","10-11","무기물 · 금속"],["은판","Silver foil","Ag foil","10-11","무기물 · 금속"],["비스무트","Bismuth","Bi","10-11","무기물 · 금속"],["카드뮴","Cadmium","Cd","10-11","무기물 · 금속"],["안티몬 가루","Antimony powder","Sb powder","10-11","무기물 · 금속"],["백금선","Platinum wire","Pt wire","10-11","무기물 · 금속"],["칼슘","Calcium","Ca","10-11","무기물 · 금속"],["구리가루","Copper powder","Cu powder","10-11","무기물 · 금속"],["규소","Silicon","Si","10-11","무기물 · 금속"],["황 분말","Sulfur powder","S powder","10-12","무기물 · 비금속"],["적인","Phosphrous red","P","10-12","무기물 · 비금속"],["활성탄","Activated Cadbon","C","10-12","무기물 · 비금속"],["숯","Charcoal","C","10-12","무기물 · 비금속"],["탄소봉","Carbon rod","C","10-12","무기물 · 비금속"],["석탄","Coal","","10-12","무기물 · 비금속"],["톱밥","Sawdust","","10-12","무기물 · 비금속"],["산화칼슘","Calcium oxide","CaO","10-13","무기물 · 산화물"],["이산화망가니즈","Manganese(Ⅳ) oxide","MnO2","10-13","무기물 · 산화물"],["산화구리(Ⅱ)","Copper(Ⅱ) oxide","CuO","10-13","무기물 · 산화물"],["산화철(Ⅲ)","Iron(Ⅲ) oxide","Fe2O3","10-13","무기물 · 산화물"],["산화아연","Zinc oxide","ZnO","10-13","무기물 · 산화물"],["일산화납","Lead(Ⅱ) oxide","PbO","10-13","무기물 · 산화물"],["이산화납","Lead(Ⅳ) oxide","PbO2","10-13","무기물 · 산화물"],["과산화나트륨","Sodium peroxide","Na2O2","10-13","무기물 · 산화물"],["과산화바륨","Barium peroxide","BaO2","10-13","무기물 · 산화물"],["산화알루미늄","Aluminium oxide","Al2O3","10-13","무기물 · 산화물"],["산화타이타늄","Titanium dioxide","TiO2","10-13","무기물 · 산화물"],["산화규소","Silicon oxide","SiO2","10-13","무기물 · 산화물"],["브로민산칼륨","Potassium Bromate","KBrO₃","10-13","무기물 · 산화물"],["삼산화나트륨비스무Bismuth","sodium trioxide","NaBiO₃","10-13","무기물 · 산화물"],["산화은","silver(I) oxide","Ag2O","10-13","무기물 · 산화물"],["리튬 텅스텐 산화물Lithium","tungsten oxide","Li2WO4","10-13","무기물 · 산화물"],["테트라이소프Titanium(IV)","isopropoxid","Ti[OCH(CH₃)₂","10-13","무기물 · 산화물"],["염화나트륨","Sodium chloride","NaCl","10-14","무기물 · 염화물"],["염화암모늄","Ammonium chloride","NH4Cl","10-14","무기물 · 염화물"],["염화철(Ⅱ)","Iron(Ⅱ) chloride","FeCl2","10-14","무기물 · 염화물"],["염화철(Ⅲ)","Iron(Ⅲ) chloride","FeCl3","10-14","무기물 · 염화물"],["염화코발트(Ⅱ)","Cobalt(Ⅱ) chloride hexa","CoCl2·6H2O","10-14","무기물 · 염화물"],["염화칼슘","Calcium chloride","CaCl2","10-14","무기물 · 염화물"],["표백분","Bleaching powder","Ca(Ocl)2","10-14","무기물 · 염화물"],["염화주석(Ⅱ)","Tin(Ⅱ) chloride","SnCl2","10-14","무기물 · 염화물"],["염화주석(Ⅳ)","Tin(Ⅳ) chloride","SnCl4","10-14","무기물 · 염화물"],["염화아연","Zinc chloride","ZnCl2","10-14","무기물 · 염화물"],["염화칼륨","Potassium chloride","KCl","10-14","무기물 · 염화물"],["염화마그네슘","Magnesium chloride","MgCl2","10-14","무기물 · 염화물"],["염화스트론튬","Strontium chloride","SrCl2","10-14","무기물 · 염화물"],["염화바륨","Barium chloride","BaCl2","10-14","무기물 · 염화물"],["염화리튬","Lithium chloride","LiCl","10-14","무기물 · 염화물"],["","Hydrogen tetrachloroaur","H(AuCl4)·4H2O","10-14","무기물 · 염화물"],["차아염소산나트륨","Sodium hypochlorite","NaClO","10-14","무기물 · 염화물"],["염화구리","Copper(II) chloride","CuCl2","10-14","무기물 · 염화물"],["염화니켈","Nickel(II) chloride","NiCl2","10-14","무기물 · 염화물"],["과염수산칼륨","Potassium perchlorate","KClO₄","10-14","무기물 · 염화물"],["염화 망가니즈(III)","Manganese(II) Chloride","MnCl2","10-14","무기물 · 염화물"],["리튬 과염소산","Lithium perchlorate","LiClO4","10-14","무기물 · 염화물"],["황산철(Ⅱ)","Iron(Ⅱ) sulfate","FeSO4","10-15","무기물 · 황산염"],["황산철(Ⅲ)","Iron(Ⅲ) sulfate","Fe2(SO4)3","10-15","무기물 · 황산염"],["황산니켈","Nickel(Ⅱ) sulfate","NiSO4","10-15","무기물 · 황산염"],["황산칼슘","Calcium sulfate","CaSO4","10-15","무기물 · 황산염"],["명반","Aluminum potassion sul","AlK(SO4)2","10-15","무기물 · 황산염"],["크로뮴명반","Chromium potassium su","KCr(SO4)2","10-15","무기물 · 황산염"],["황산아연","Zinc sulfate","ZnSO4","10-15","무기물 · 황산염"],["황산알루미늄","Aluminum sulfate","Al2(SO4)3","10-15","무기물 · 황산염"],["황산암모늄","Ammonium sulfate","(NH4)2SO4","10-15","무기물 · 황산염"],["황산바륨","Barium sulfate","BaSO4","10-15","무기물 · 황산염"],["황산마그네슘","Magnesium sulfate","MgSO4","10-15","무기물 · 황산염"],["황산나트륨","Sodium sulfate","Na2SO4","10-15","무기물 · 황산염"],["아황산나트륨","Sodium sulfite","Na2SO3","10-15","무기물 · 황산염"],["아황산수소나트륨","Sodium hydrogen sulfite","NaHSO3","10-15","무기물 · 황산염"],["싸이오황산나트륨","Sodium thiosulfate","Na2S2O3","10-15","무기물 · 황산염"],["황산구리(II)","Copper(II) sulfate","CuSO4","10-15","무기물 · 황산염"],["","Ammonium iron(II) sulfa","Fe(SO4)(NH4)2","10-15","무기물 · 황산염"],["암모늄명반","Ammonium alum","(NH4)Al(SO4)2","10-15","무기물 · 황산염"],["황산은","Silver(I) sulfate","Ag2SO4","10-15","무기물 · 황산염"],["황산납","Lead sulfate","PbSO4","10-15","무기물 · 황산염"],["황산망가니즈","Manganese Sulfate","MnSO4","10-15","무기물 · 황산염"],["과황산암모늄","Ammonium Persulfate","(NH4)2S2O8","10-15","무기물 · 황산염"],["다이아황산나트륨","SODIUM METABISULFIT","Na2S2O5","10-15","무기물 · 황산염"],["황산칼륨","potassium sulfate","K2SO4","10-15","무기물 · 황산염"],["황산수소칼륨","potassium hydrogensulfa","KHSO4","10-15","무기물 · 황산염"],["아황산수소칼륨","Potassium hydrogen sul","KHSO3","10-15","무기물 · 황산염"],["묽은황산칼륨","","K2SO4","10-15","무기물 · 황산염"],["","SLES","","10-15","무기물 · 황산염"],["질산칼륨","Potassium nitrate","KNO3","10-16","무기물 · 질산염"],["질산스트론튬","Strontium nitrate","Sr(NO3)2","10-16","무기물 · 질산염"],["질산바륨","Barium nitrate","Ba(NO3)2","10-16","무기물 · 질산염"],["질산나트륨","Sodium nitrate","NaNO3","10-16","무기물 · 질산염"],["질산암모늄","Ammonium nitrate","NH4NO3","10-16","무기물 · 질산염"],["질산은","Silver nitrate","AgNO3","10-16","무기물 · 질산염"],["질산납","Lead nitrate","Pb(NO3)2","10-16","무기물 · 질산염"],["질산구리","Copper(II) nitrate","Cu(NO3)2","10-16","무기물 · 질산염"],["질산아연","Zinc nitrate","Zn(NO3)2","10-16","무기물 · 질산염"],["질산알루미늄","Aluminum nitrate","Al(NO3)3","10-16","무기물 · 질산염"],["질산니켈","Nickel(II) nitrate","Ni(NO3)2","10-16","무기물 · 질산염"],["질산망가니즈","Manganese(II) nitrate hy","Mn(NO₃)₂","10-16","무기물 · 질산염"],["질산마그네슘","Magnesium nitrate","Mg(NO3)2","10-16","무기물 · 질산염"],["질산크로뮴","Chromium(III) nitrate","Cr(NO₃)₃","10-16","무기물 · 질산염"],["질산세륨암모늄","Ceric ammonium nitrate","CeH₈N₈O₁₈","10-16","무기물 · 질산염"],["질산철","Iron(III) nitrate","Fe(NO3)3","10-16","무기물 · 질산염"],["질산코발트","Cobalt(II) Nitrate","Co(NO3)2","10-16","무기물 · 질산염"],["질산비스무스","Bismuth(III) nitrate","Bi(NO3)3","10-16","무기물 · 질산염"],["질산칼슘","Calcium nitrate","Ca(NO₃)₂","10-16","무기물 · 질산염"],["아질산 나트륨","Sodium nitrite","NaNO2","10-16","무기물 · 질산염"],["탄산나트륨","Sodium carbonate","Na2CO3","10-17","무기물 · 탄산염"],["탄산수소나트륨","Sodium Bicarbonate","NaHCO3","10-17","무기물 · 탄산염"],["탄산칼슘","Calcium carbonate","CaCO3","10-17","무기물 · 탄산염"],["탄산칼륨","Potassium carbonate","K2CO3","10-17","무기물 · 탄산염"],["탄산암모늄","Ammonium carbonate","(NH4)2CO3","10-17","무기물 · 탄산염"],["탄산납","Lead(II) carbonate","PbCO3","10-17","무기물 · 탄산염"],["탄산마그네슘","Magnesium carbonate","MgCO3","10-17","무기물 · 탄산염"],["중탄산암모늄","Ammonium hydrogen ca","(NH₄)HCO₃","10-17","무기물 · 탄산염"],["탄산리튬","Lithium carbonate","Li2CO3","10-17","무기물 · 탄산염"],["탄산수소칼륨","Potassium bicarbonate","KHCO₃","10-17","무기물 · 탄산염"],["탄산구리","Copper (II) carbonate","CuCO₃","10-17","무기물 · 탄산염"],["황화철(Ⅱ)","Iron(Ⅱ) sulfide","FeS","10-18","무기물 · 황화물"],["황화나트륨","Sodium sulfide","Na2S","10-18","무기물 · 황화물"],["황화안티모니","Antimony trisulfide","Sb2S3","10-18","무기물 · 황화물"],["황화수은","Mercury sulfide","HgS","10-18","무기물 · 황화물"],["황화비소(Ⅲ)","Arsenic trisulfide","As2S3","10-18","무기물 · 황화물"],["황화아연","Zinc sulfide","ZnS","10-18","무기물 · 황화물"],["붕산","Boric acid","H3BO3","10-19","무기물 · 무기일반"],["","Borax","B4O7Na2·10H2","10-19","무기물 · 무기일반"],["과망가니즈산칼륨","Potassium permanganat","KMnO4","10-19","무기물 · 무기일반"],["헥사시아노철(Ⅱ)산Potassium","hexacyanofer","K4[Fe(CN)6]","10-19","무기물 · 무기일반"],["헥사시아노철(Ⅲ)산Potassium","hexacyanofer","K3[Fe(CN)6]","10-19","무기물 · 무기일반"],["싸이오시안산칼륨","Potassium thiocyanate","KSCN","10-19","무기물 · 무기일반"],["브로민화칼륨","Potassium bromide","KBr","10-19","무기물 · 무기일반"],["규산나트륨","Sodium silicate","Na2SiO3","10-19","무기물 · 무기일반"],["소다석회","Soda lime","","10-19","무기물 · 무기일반"],["아이오딘산칼륨","Potassium iodate","KIO3","10-19","무기물 · 무기일반"],["수소화붕소나트륨","Sodium borohydride","NaBH4","10-19","무기물 · 무기일반"],["아이오딘화칼륨","Potassium iodide","KI","10-19","무기물 · 무기일반"],["아이오딘화나트륨","Sodium iodide","NaI","10-19","무기물 · 무기일반"],["브로민화나트륨","Sodium bromide","NaBr","10-19","무기물 · 무기일반"],["아이오딘-아이오딘Iodine-potassium","iodide","I2-KI","10-19","무기물 · 무기일반"],["인산나트륨","Sodium Phosphate","Na3PO4","10-19","무기물 · 무기일반"],["간수","Bittern","","10-19","무기물 · 무기일반"],["생리식염수","Saline solution","NaCl","10-19","무기물 · 무기일반"],["표준완충용액","Buffer solution","","10-19","무기물 · 무기일반"],["염소산칼륨","Potassium chlorate","KClO3","10-19","무기물 · 무기일반"],["인산수소칼륨","Potassium hydrogenpho","KH2PO4","10-19","무기물 · 무기일반"],["아자이드화나트륨","Sodium azide","NaN3","10-19","무기물 · 무기일반"],["제2인산칼륨","Potassium hydrogenpho","K2HPO4","10-19","무기물 · 무기일반"],["페로센","bis(η5-cyclopentadienyl","Fe(C5H5)2","10-19","무기물 · 무기일반"],["브로민화구리","Copper (II) bromide","Cu Br 2","10-19","무기물 · 무기일반"],["제1인산칼륨","Potassium Phosphate M","KH₂PO₄","10-19","무기물 · 무기일반"],["제2인산 나트륨","Disodium Hydrogen Pho","Na₂HPO₄","10-19","무기물 · 무기일반"],["바나듐산암모늄","Ammonium vanadate(V)","NH₄VO₃","10-19","무기물 · 무기일반"],["염소산나트륨","sodium chlorate","NaClO3","10-19","무기물 · 무기일반"],["몰리브덴산나트륨","Sodium Molybdate","Na2MoO₄","10-19","무기물 · 무기일반"],["플루오린화 나트륨Sodium","Fluoride","NaF","10-19","무기물 · 무기일반"],["크롬산칼륨","Potassium chromate","K₂CrO₄","10-19","무기물 · 무기일반"],["티오시안산나트륨","Sodium thiocyanate","NaSCN","10-19","무기물 · 무기일반"],["삼폴리인산나트륨Sodium","tripolyphosp","Na₅P₃O₁₀","10-19","무기물 · 무기일반"],["티오시안산칼륨","Potassium thiocyanate","KSCN","10-19","무기물 · 무기일반"],["아이오딘화 구리","copper(I) iodide","CuI","10-19","무기물 · 무기일반"],["아이오딘화","Lead(II) iodide","PbI₂","10-19","무기물 · 무기일반"],["포도당","Glucose","C6H12O6","20-21","유기물 · 탄수화물"],["설탕","Sucrose","C12H22O11","20-21","유기물 · 탄수화물"],["녹말","Starch","","20-21","유기물 · 탄수화물"],["아라비아고무","Gum arabic","","20-21","유기물 · 탄수화물"],["한천","Agar powder","","20-21","유기물 · 탄수화물"],["젖당","Lactose","C12H22O11","20-21","유기물 · 탄수화물"],["덱스트린","Dextrin","(C6H10O5)n","20-21","유기물 · 탄수화물"],["과당","Fructose","C6H12O6","20-21","유기물 · 탄수화물"],["셀룰로오스","Cellulose","(C6H10O5)n","20-21","유기물 · 탄수화물"],["덱스트로오스","Dextrose","C6H12O6","20-21","유기물 · 탄수화물"],["라이페이스","lipase","","20-21","유기물 · 탄수화물"],["아드레날린","adrenaline","C₉H₁₃NO₃","20-21","유기물 · 탄수화물"],["클로렐라","chlorell","","20-21","유기물 · 탄수화물"],["아밀레이스","amylase","","20-21","유기물 · 탄수화물"],["셀룰레이스","cellulase","","20-21","유기물 · 탄수화물"],["글리콜산","Glycolic acid","C₂H₄O₃","20-22","유기물 · 유기산·염"],["타타르산","Tartaric acid","C4H6O6","20-22","유기물 · 유기산·염"],["","Ammonium iron(Ⅲ) citrate","(NH4)5[Fe(C6H","20-22","유기물 · 유기산·염"],["폼산","Formic acid","HCOOH","20-22","유기물 · 유기산·염"],["옥살산","Oxalic acid","C2H2O4","20-22","유기물 · 유기산·염"],["구연산(시트르산)","Citric acid","C6H8O7","20-22","유기물 · 유기산·염"],["탄닌산","Tannic acid","C76H52O46","20-22","유기물 · 유기산·염"],["살리실산","Salicylic acid","C7H6O3","20-22","유기물 · 유기산·염"],["피크린산","Picric acid","C6H3N3O7","20-22","유기물 · 유기산·염"],["타타르산칼륨나트륨Potassium","sodium tartrate","KNaC4H4O6·4","20-22","유기물 · 유기산·염"],["아세트산알루미늄","Aluminum acetate basic","HOAl(CH3CO2","20-22","유기물 · 유기산·염"],["벤조산","Benzoic acid","C7H6O2","20-22","유기물 · 유기산·염"],["타타르산철암모늄","Ammonium iron tartrate","C8H12FeNO12","20-22","유기물 · 유기산·염"],["구연산나트륨","Sodium citrate","C6H5Na3O7","20-22","유기물 · 유기산·염"],["스테아르산","Stearic acid","C18H36O2","20-22","유기물 · 유기산·염"],["아세트산나트륨","Sodium acetate","C2H3NaO2","20-22","유기물 · 유기산·염"],["옥살산나트륨","Sodium oxalate","Na2C2O4","20-22","유기물 · 유기산·염"],["EDTA","Ethylenediaminetetraacetic acid","C10H16N2O8","20-22","유기물 · 유기산·염"],["EDTA 염","Ethylenediaminetetraacetic acid","C10H14N2Na2","20-22","유기물 · 유기산·염"],["스테아르산칼슘","Calcium stearate","C36H70CaO4","20-22","유기물 · 유기산·염"],["키토산","Chitosan","","20-22","유기물 · 유기산·염"],["올레산","Oleic acid","C18H34O2","20-22","유기물 · 유기산·염"],["옥살산칼슘","Calcium oxalate","CaC2O4","20-22","유기물 · 유기산·염"],["아스코브산","Ascorbic acid","C6H8O6","20-22","유기물 · 유기산·염"],["아스파테임","Aspartame","C14H18N2O5","20-22","유기물 · 유기산·염"],["다이나이트로살리실3,5-Dinitrosalicylic","acid","C7H4N2O7","20-22","유기물 · 유기산·염"],["벤조산나트륨","Sodium benzoate","C7H5NaO2","20-22","유기물 · 유기산·염"],["말론산","Malonic acid","C3H4O4","20-22","유기물 · 유기산·염"],["10,12-펜타코사다이10,12-Pentacosadiynoic","acid","C25H42O2","20-22","유기물 · 유기산·염"],["6,8-노나데카다이노6,8-Nonadecadiynoic","acid","C19H30O2","20-22","유기물 · 유기산·염"],["10,12-트라이코사다10,12-Tricosadiynoic","acid","C23H38O2","20-22","유기물 · 유기산·염"],["10,12-옥타데카다이10,12-Octadecadiynoic","acid","C18H28O2","20-22","유기물 · 유기산·염"],["키틴","Chitin","(C8H13O5N)n","20-22","유기물 · 유기산·염"],["3,4-다이하이드록시3-(3,4-Dihydroxyphenyl-L-alani","","(HO)2C6H3CH","20-22","유기물 · 유기산·염"],["설파닐산","Sulfanilic acid","C6H7NO3S","20-22","유기물 · 유기산·염"],["p-아미노벤조산","4-Aminobenzoic acid","C7H7NO2","20-22","유기물 · 유기산·염"],["","succinic acid","(CH2)2(CO2H)2","20-22","유기물 · 유기산·염"],["아세틸살리실산 (아acetylsalicylic","acid","C₉H₈O₄","20-22","유기물 · 유기산·염"],["팔미트산","palmitic acid","C₁₆H₃₂O₂","20-22","유기물 · 유기산·염"],["말레산","Maleic acid","C4H4O4","20-22","유기물 · 유기산·염"],["폴리아크릴산나트륨Sodium","Polyacrylate","(C3H3NaO2)n","20-22","유기물 · 유기산·염"],["타타르산수소나트륨Sodium","hydrogen carbonate","NaC₄H₅O₆","20-22","유기물 · 유기산·염"],["젖산칼슘","Calcium Lactate","C6H10CaO6","20-22","유기물 · 유기산·염"],["아세트산칼슘","Calcium acetate","Ca(C2H3O2)2","20-22","유기물 · 유기산·염"],["타타르산칼륨","Potassium Hydroxide","C4H4K2O6","20-22","유기물 · 유기산·염"],["중탄산염 (탄산수소Bicarbonate","","HCO3","20-22","유기물 · 유기산·염"],["프탈산수소칼륨","Potassium hydrogen phthalate","C₈H₅KO₄","20-22","유기물 · 유기산·염"],["아세트산; 빙초산","acetic acid","CH3COOH","20-22","유기물 · 유기산·염"],["초산구리 1수화물","Copper(II)_Acetate_monohydrate","Cu(CH₃CO₂)₂","20-22","유기물 · 유기산·염"],["테트라메틸암모늄","Tetramethylammonium, TMA","","20-22","유기물 · 유기산·염"],["벤젠트라이카복실산benzenetricarboxylic","acid","C9H6O","20-22","유기물 · 유기산·염"],["나이트로벤젠","Nitrobenzene","C6H5NO2","20-22","유기물 · 유기산·염"],["플루오레세인","Fluorescein","C₂₀H₁₂O₅","20-22","유기물 · 유기산·염"],["부티르산","Butyric acid","C4H8O2","20-22","유기물 · 유기산·염"],["리보플라빈","riboflavin","C17H20N4O6","20-22","유기물 · 유기산·염"],["야자유","Palm oil","","20-23","유기물 · 유지"],["면실유","Cotton seed oil","","20-23","유기물 · 유지"],["올리브유","Olive oil","","20-23","유기물 · 유지"],["피마자유","Castor oil","","20-23","유기물 · 유지"],["아마유","Linseed oil","","20-23","유기물 · 유지"],["목랍","Japanese wax","","20-23","유기물 · 유지"],["밀랍","Bees wax","","20-23","유기물 · 유지"],["유칼립투스","Eucalyptus","","20-23","유기물 · 유지"],["대두유","Soybean oil","","20-23","유기물 · 유지"],["나프탈렌","Naphthalene","C10H8","20-24","유기물 · 유기일반"],["디아스테이스","Diastase","","20-24","유기물 · 유기일반"],["글리세롤(린)","Glycerol(Glycerin)","C3H8O3","20-24","유기물 · 유기일반"],["요소","Urea","CO(NH2)2","20-24","유기물 · 유기일반"],["송진","Pine resin","","20-24","유기물 · 유기일반"],["젤라틴","Gelatin","","20-24","유기물 · 유기일반"],["하이드로퀴논","Hydroquinone(Benzene-","C6H6O2","20-24","유기물 · 유기일반"],["알긴산나트륨","Sodium alginate","C6H9NaO7","20-24","유기물 · 유기일반"],["캐나다발삼","Canada balsam","","20-24","유기물 · 유기일반"],["생고무","Crude rubber","","20-24","유기물 · 유기일반"],["카제인","Casein","","20-24","유기물 · 유기일반"],["효모","Yeast","","20-24","유기물 · 유기일반"],["캄파","Camphor","C10H16O","20-24","유기물 · 유기일반"],["아카시아 검","Gum arabic 중복(21-04","","20-24","유기물 · 유기일반"],["알부민","Albumin","","20-24","유기물 · 유기일반"],["송화분","Pinus densiflora siebold","","20-24","유기물 · 유기일반"],["카보머(증점제)","Carbomer","(C3H4O2)n","20-24","유기물 · 유기일반"],["인공혈액","Artificial blood","","20-24","유기물 · 유기일반"],["트윈80(PolysorbateTween","80(Polysorbate 8","C64H124O26","20-24","유기물 · 유기일반"],["트리톤X","Triton X","","20-24","유기물 · 유기일반"],["카페인","Caffeine","C8H10N4O2","20-24","유기물 · 유기일반"],["닌하이드린","Ninhydrin","C9H6O4","20-24","유기물 · 유기일반"],["티모프탈레인","Thymolphthalein","C28H30O4","20-24","유기물 · 유기일반"],["파라핀","Paraffin","","20-24","유기물 · 유기일반"],["소비톨","Sorbitol","C6H14O6","20-24","유기물 · 유기일반"],["","glycol","H-[OCH2CH2","20-24","유기물 · 유기일반"],["트윈80(PolysorbateTween","80(Polysorbate 8중복(24-19","C64H124O26","20-24","유기물 · 유기일반"],["이온교환수지","Ion exchange resin","","20-24","유기물 · 유기일반"],["레조시놀","Resorcinol(Benzene-1,3","C6H6O2","20-24","유기물 · 유기일반"],["콜레스테롤","cholesterol","C₂₇H₄₆O","20-24","유기물 · 유기일반"],["파라-니트로아닐린p-Nitroaniline","","C6H6N2O2","20-24","유기물 · 유기일반"],["브로모 다이에틸 아4-bromo-N,N-diethylan","","C₁₀H₁₄BrN","20-24","유기물 · 유기일반"],["아세트아미노펜","Acetaminophen","C8H9NO2","20-24","유기물 · 유기일반"],["뷰틸레이트하이드록Butylated","hydroxy toluen","C₁₅H₂₄O","20-24","유기물 · 유기일반"],["안트라센","Anthracene","C14H10","20-24","유기물 · 유기일반"],["","Oxide, PEO","H(OCH₂CH₂)","20-24","유기물 · 유기일반"],["부틸하이드록시아니Butylated","Hydroxyanisole","C11H16O2","20-24","유기물 · 유기일반"],["메틸파라벤","Methylparaben","C8H8O3","20-24","유기물 · 유기일반"],["헤모글로빈","Hb, hemoglobin","","20-24","유기물 · 유기일반"],["레시틴","Lecithin","","20-24","유기물 · 유기일반"],["폴리비닐피롤리돈","Polyvinylpyrrolidone, PVP","(C₆H₉NO)n","20-24","유기물 · 유기일반"],["알파-토코페롤","alpha-Tocopherol","C29H50O2","20-24","유기물 · 유기일반"],["2-메틸이미다졸","2-Methylimidazole","C4H6N2","20-24","유기물 · 유기일반"],["폴리에틸렌이민","Polyethyleneimine","","20-24","유기물 · 유기일반"],["덱스트린","dextrin","(C6H10O5)n","20-24","유기물 · 유기일반"],["발표경질우레탄레진","","","20-24","유기물 · 유기일반"],["알파-토코페롤","alpha-Tocopherol 중복(24-48","C29H50O2","20-24","유기물 · 유기일반"],["","Calmagite","C17H14N2O5S","20-24","유기물 · 유기일반"],["이부프로펜","Ibuprofen","C13H18O2","20-24","유기물 · 유기일반"],["아세트아닐리드","acetanilide","C8H9NO","20-24","유기물 · 유기일반"],["","Eosin Y","C20H6Br4Na2O","20-25","유기물 · 염료"],["메틸렌블루","Methylene blue","C16H18ClN3S","20-25","유기물 · 염료"],["","Light green","C37H36N2O9S","20-25","유기물 · 염료"],["콩고레드","Congo red","","20-25","유기물 · 염료"],["샤프라닌","Safranin","C20H19ClN4","20-25","유기물 · 염료"],["후크신","Fuchsine","C20H19N3·HC","20-25","유기물 · 염료"],["비스마르크브라운","Bismarck Brown","","20-25","유기물 · 염료"],["","Indigo carmine","C16H8N2Na2O","20-25","유기물 · 염료"],["알리자린","Alizarin","C14H8O4","20-25","유기물 · 염료"],["수단Ⅲ","SudanⅢ","C22H16N4O","20-25","유기물 · 염료"],["아세트산카민","Aceto carmine","","20-25","유기물 · 염료"],["형광안료","Fluorescent pigment","","20-25","유기물 · 염료"],["블랙T","Eriochrome Black T","C20H12N3NaO","20-25","유기물 · 염료"],["티오닌","Thionin","C12H10ClN3S","20-25","유기물 · 염료"],["크리스탈 바이올렛Crystal","Violet","C25N3H30Cl","20-25","유기물 · 염료"],["플루오레세인","Fluorescein","C20H12O5","20-25","유기물 · 염료"],["탈색제","에탄올+아세톤","","20-25","유기물 · 염료"],["쿠마시블루","Coomassie Brilliant Blue","","20-25","유기물 · 염료"],["리트머스","Litmus","","20-26","유기물 · 특수시약"],["페놀프탈레인","Phenolphthalein","C20H14O4","20-26","유기물 · 특수시약"],["네슬러시약","Nessler's reagent","K2[HgI4]","20-26","유기물 · 특수시약"],["아이오딘팅크","Tincture of iodine","","20-26","유기물 · 특수시약"],["","Methyl orange","C14H14N3NaO","20-26","유기물 · 특수시약"],["다이페닐아민","Diphenylamine","C12H11N","20-26","유기물 · 특수시약"],["몰리브데넌삼암모늄Ammonium","molybdate","H12MoN2O4","20-26","유기물 · 특수시약"],["펠링용액","Fehling solution","","20-26","유기물 · 특수시약"],["만능지시약","Universal indicator","","20-26","유기물 · 특수시약"],["PTC","Phenylthiocarbamide","C7H8N2S","20-26","유기물 · 특수시약"],["루미놀","Luminol","C8H7N3O2","20-26","유기물 · 특수시약"],["양배추 지시약","Cabbage indicator","","20-26","유기물 · 특수시약"],["베네딕트용액","Benedict's solution","","20-26","유기물 · 특수시약"],["","Bromothymol blue","C27H28Br2O5SBTB","20-26","유기물 · 특수시약"],["DPPH","2,2-Diphenyl-1-(2,4,6-","C18H12N5O6","20-26","유기물 · 특수시약"],["HEPES","2-[4-(2-hydroxyethyl)pi","C8H18N2O4S","20-26","유기물 · 특수시약"],["벤조피렌","Benzopyrene","C20H12","20-26","유기물 · 특수시약"],["메틸레드","Methyl red","C15H15N3O2","20-26","유기물 · 특수시약"],["뮤렉사이드","Murexide","C8H8N6O6","20-26","유기물 · 특수시약"],["DNS 시약","DNS","","20-26","유기물 · 특수시약"],["펩신","Saccharated Pepsin","","20-26","유기물 · 특수시약"],["오렌지G","Orange G","","20-26","유기물 · 특수시약"],["페놀 레드","Phenol red","C19H14O5S","20-26","유기물 · 특수시약"],["티몰블루","Thymol blue","C27H30O5S","20-26","유기물 · 특수시약"],["","orthomolybd","(NH4)6Mo7O2","20-26","유기물 · 특수시약"],["디크로메이Pyridinium","Chlorochroma","C10H12N2Cr2O","20-26","유기물 · 특수시약"],["전개액","Chromatography solvent","","20-26","유기물 · 특수시약"],["증류수","Distilled water","H2O","20-27","유기물 · 잡"],["비누가루","Soap powder","","20-27","유기물 · 잡"],["합성세제","Synthetic detergent","","20-27","유기물 · 잡"],["초","Candle","","20-27","유기물 · 잡"],["선향","Incense","","20-27","유기물 · 잡"],["바셀린","Baseline","","20-27","유기물 · 잡"],["흡습건조제","desiccant","","20-27","유기물 · 잡"],["페이스트","Paste","","20-27","유기물 · 잡"],["니스(바니시)","Varnish","","20-27","유기물 · 잡"],["폴리비닐알코올(PV","Polyvinyl alcohol","(C2H4O)n","20-27","유기물 · 잡"],["끓임쪽","Boiling chip","","20-27","유기물 · 잡"],["폴리비닐피롤리돈(PPolyvinyl","pyrrolidone","(C6H9NO)n","20-27","유기물 · 잡"],["활성탄소","중복(12-3)","","20-27","유기물 · 잡"],["수산화나트륨","Sodium hydroxide","NaOH","30-31","위험물 · 수산화물"],["암모니아수","Ammonia solution","NH4OH","30-31","위험물 · 수산화물"],["수산화칼슘","Calcium hydroxide","Ca(OH)2","30-31","위험물 · 수산화물"],["석회수","Lime water","Ca(OH)2","30-31","위험물 · 수산화물"],["수산화칼륨","Potassium hydroxide","KOH","30-31","위험물 · 수산화물"],["수산화바륨","Barium hydroxide","Ba(OH)2","30-31","위험물 · 수산화물"],["수산화알루미늄","Aluminum hydroxide","Al(OH)3","30-31","위험물 · 수산화물"],["염산","Hydrochloric acid","HCl","30-32","위험물 · 무기산"],["황산","Sulfuric acid","H2SO4","30-32","위험물 · 무기산"],["질산","Nitric acid","HNO3","30-32","위험물 · 무기산"],["발연질산","Fuming nitric acid","","30-32","위험물 · 무기산"],["인산","Phosphoric acid","H3PO4","30-32","위험물 · 무기산"],["플루오린화수소산","Hydrofluoric acid","HF","30-32","위험물 · 무기산"],["메타인산","Metaphosphoric acid","HPO3","30-32","위험물 · 무기산"],["설파민산","Sulfamic acid","H₂NSO₃H","30-32","위험물 · 무기산"],["메틸알코올","Methyl alcohol","CH3OH","30-33","위험물 · 인화물"],["에틸알코올","Ethyl alcohol","C2H5OH","30-33","위험물 · 인화물"],["다이에틸에터","Ethyl ether","C2H5OC2H5","30-33","위험물 · 인화물"],["뷰틸알코올","Butyl alcohol","C4H9OH","30-33","위험물 · 인화물"],["아이소펜틸알코올","Isopentyl alcohol","C5H11OH","30-33","위험물 · 인화물"],["옥틸알코올","Octyl alcohol","C8H17OH","30-33","위험물 · 인화물"],["프로필알코올","Propyl alcohol","C3H8O","30-33","위험물 · 인화물"],["벤젠","Benzene","C6H6","30-33","위험물 · 인화물"],["가솔린","Gasoline","","30-33","위험물 · 인화물"],["석유","Petroleum","","30-33","위험물 · 인화물"],["헥세인","Hexane","C6H14","30-33","위험물 · 인화물"],["아세톤","Acetone","(CH3)2CO","30-33","위험물 · 인화물"],["아세트산아밀","Amyl acetate","CH3COOC5H1","30-33","위험물 · 인화물"],["톨루엔","Toluene","C7H8","30-33","위험물 · 인화물"],["피리딘","Pyridine","C5H5N","30-33","위험물 · 인화물"],["사염화탄소","Carbon tetrachloride","CCl4","30-33","위험물 · 인화물"],["메틸피롤리돈","Methyl pyrrolidone","C5H9NO","30-33","위험물 · 인화물"],["무수아세트산","Acetic anhydride","C4H6O3","30-33","위험물 · 인화물"],["염화메틸렌","Dichloromethane","CH2Cl2","30-33","위험물 · 인화물"],["헥사메틸렌다이아민Hexamethylenediamine","","C6H16N2","30-33","위험물 · 인화물"],["클로로폼","Chloroform","CHCl3","30-33","위험물 · 인화물"],["다이메틸아닐린","N,N-Dimethylaniline","C₈H₁₁N","30-33","위험물 · 인화물"],["염화아디포일","Adipoyl chloride","C6H8Cl2O2","30-33","위험물 · 인화물"],["페놀","Phenol","C6H6O","30-33","위험물 · 인화물"],["크레졸","Cresol","C7H8O","30-33","위험물 · 인화물"],["트라이에탄올아민","Triethanolamine","C6H15NO3","30-33","위험물 · 인화물"],["아세트알데하이드","Acetaldehyde","C2H4O","30-33","위험물 · 인화물"],["에탈렌다이아민","Ethylenediamine","C2H8N2","30-33","위험물 · 인화물"],["아닐린","Aniline","C6H7N","30-33","위험물 · 인화물"],["아세트산에틸","Ethyl acetate","C4H8O2","30-33","위험물 · 인화물"],["사이클로헥산올","Cyclohexanol","C6H12O","30-33","위험물 · 인화물"],["아세트산뷰틸","Butyl acetate","C6H12O2","30-33","위험물 · 인화물"],["아이소프로판올","Isopropanol","(CH3)2CHOH","30-33","위험물 · 인화물"],["테트라하이드로퓨란Tetrahydrofuran","","C4H8O","30-33","위험물 · 인화물"],["아밀알코올","Amyl alcohol","C5H12O","30-33","위험물 · 인화물"],["벤질알코올","Benzyl alcohol","C7H8O","30-33","위험물 · 인화물"],["프로필렌글라이콜","Propylene glycol","C3H8O2","30-33","위험물 · 인화물"],["아세틸아세톤","Acetylacetone","C5H8O2","30-33","위험물 · 인화물"],["메틸에틸케톤","Methyl ethyl ketone","C4H8O","30-33","위험물 · 인화물"],["트라이메틸펜테인","Trimethylpentane","C8H18","30-33","위험물 · 인화물"],["석유에터","petroleum ether","C5H12+C6H14","30-33","위험물 · 인화물"],["아크릴산에틸","Ethyl acrylate","C5H8O2","30-33","위험물 · 인화물"],["아크릴산메틸","Methyl acrylate","C4H6O2","30-33","위험물 · 인화물"],["다이메틸아세트아마Dimethylacetamide","","C4H9NO","30-33","위험물 · 인화물"],["뷰틸아민","Butylamine","C4H11N","30-33","위험물 · 인화물"],["세탄올(세틸알코올)","Cetyl alcohol","C16H34O","30-33","위험물 · 인화물"],["벤즈알데하이드","Benzaldehyde","C7H6O","30-33","위험물 · 인화물"],["tert- 부틸알코올","t -BuOH","(CH₃)₃COH","30-33","위험물 · 인화물"],["4-아미노페놀","4-aminophenol","C6H7NO","30-33","위험물 · 인화물"],["아세트산 프로필","propyl acetate","C5H10O2","30-33","위험물 · 인화물"],["자일렌","xylene","C₈H₁₀","30-33","위험물 · 인화물"],["아이소뷰틸 메틸케톤Methyl","isobutyl ketone","C6H12O","30-33","위험물 · 인화물"],["에틸에테르","ethyl ether (diethyl ether33-3","(C2H5)2O","30-33","위험물 · 인화물"],["아세트아마이드","acetamide","CH3CONH2","30-33","위험물 · 인화물"],["모노에탄올아민","Monoethanolamine, MEA","C₂H₇NO","30-33","위험물 · 인화물"],["다이메틸폼아마이드Dimethylformamide","","C3H7NO","30-33","위험물 · 인화물"],["다이메틸 설폭사이드Dimethyl","Sulfoxide, DMS","C2H6OS","30-33","위험물 · 인화물"],["과산화수소","Hydrogen peroxide","H2O2","30-34","위험물 · 독극물"],["폼알데하이드","Form aldehyde","CH2O","30-34","위험물 · 독극물"],["아이오딘","Iodine","I2","30-34","위험물 · 독극물"],["브로민수","Bromine water","Br2","30-34","위험물 · 독극물"],["리튬","Lithium","Li","30-34","위험물 · 독극물"],["나트륨","Sodium","Na","30-34","위험물 · 독극물"],["칼륨","Potassium","K","30-34","위험물 · 독극물"],["수은","Mercury","Hg","30-34","위험물 · 독극물"],["염화수은(Ⅰ)","Mercury(Ⅰ) chloride","Hg2Cl2","30-34","위험물 · 독극물"],["염화수은(Ⅱ)","Mercury(Ⅱ) chloride","HgCl2","30-34","위험물 · 독극물"],["비스무트산나트륨","Sodium bismuthate","NaBiO3","30-34","위험물 · 독극물"],["아세트산납","Lead(Ⅱ) acetate","(CH3COO)2Pb","30-34","위험물 · 독극물"],["염소수","Chlorine water","Cl2","30-34","위험물 · 독극물"],["다이크로뮴산칼륨","Potassium dichromate","K2Cr2O7","30-34","위험물 · 독극물"],["다이크로뮴산암모늄Ammonium","dichoromate","(NH4)2Cr2O7","30-34","위험물 · 독극물"],["칼슘카바이드","Calcium carbide","CaC2","30-34","위험물 · 독극물"],["티오시안산수은(II)","Mercury(II) thiocyanate","Hg(SCN)2;","30-34","위험물 · 독극물"],["질산카드뮴","Cadmium nitrate","Cd(NO₃)₂","30-34","위험물 · 독극물"]];
+  const productPurities = [["마그네슘 리본","99.0%","삼천","Magnesium, ribbon, 99.0%","M1302"],["아연 가루","99.0%","삼천","Zinc, powder, 99.0%","Z0140"],["아연 가루","99%","대정","Zinc, powder 99%","8610-4405"],["철가루","90%","대정","Iron, powder 90%","5027-4405"],["황 분말","99%","대정","Sulfur, powder 99%","7682-4405"],["이산화망가니즈","70%","대정","Manganese(IV) oxide 70%","5532-1405"],["산화구리(Ⅱ)","95.0%","삼천","Copper(II) oxide, 95.0% (T)","C0976"],["산화철(Ⅲ)","≥96%","SIGMA","Iron(III) oxide, powder, <5 μm, ≥96%","310050"],["산화아연","99%","대정","Zinc oxide 99%","8602-4405"],["산화아연","99.9%","SIGMA","Zinc oxide, ReagentPlus®, powder, <5 μm particle size, 99.9%","205532"],["산화아연","99.0%","삼천","Zinc oxide, 99.0%","Z0070"],["산화아연",">97%","SIGMA","Zinc oxide, nanopowder, <50 nm particle size (BET), >97%","677450"],["산화알루미늄","98%","대정","Aluminium oxide 98%","1037-1405"],["산화타이타늄","98.5%","삼천","Titanium(IV) oxide, anatase form, 98.5%",""],["산화타이타늄","98%","대정","Titanium(IV) oxide, Rutile 98%","8537-1405"],["브로민산칼륨","99.3%","대정","Potassium bromate 99.3%","6561-4400"],["염화나트륨","99.0%","삼천","Sodium chloride, 99.0%","S0476"],["염화나트륨","99%","대정","Sodium chloride 99%, Extra Pure","7648-4100"],["염화나트륨","99.5%","대정","Sodium chloride 99.5%, GR,","7648-4400"],["염화나트륨","99.5%","대정","Sodium chloride 99.5%","7548-4100"],["염화암모늄","99.0%","삼천","Ammonium chloride, 99.0%","A0703"],["염화철(Ⅲ)","98%","대정","Iron(III) chloride hexahydrate 98%","5021-4405"],["염화주석(Ⅱ)","95.0%","삼천","Tin(II) chloride dihydrate, 95.0%","T0358"],["염화칼륨","99.0%","삼천","Potassium chloride, 99.0%","P0831"],["염화칼륨","99%","대정","Potassium chloride 99%","6566-4405"],["염화스트론튬","99%","SIGMA","Strontium chloride hexahydrate ACS reagent, 99%","255521"],["염화바륨","≥99%","SIGMA","Barium chloride dihydrate, ACS reagent, ≥99%","217565"],["염화구리","97%","대정","Copper(II) chloride dihydrate 97%","2585-4405"],["리튬 과염소산","95.0%","삼천","Lithium Cobalt chloride perchlorate, test paper anhydrous, 95.0%","L0701"],["황산철(Ⅱ)","98~102.5%","대정","Iron(II) sulfate heptahydrate 98~102.5%","5017-4405"],["명반","99.2%","삼천","Aluminum potassium sulfate dodecahydrate, 99.2%","A0460"],["황산알루미늄","51.0-57.5%","삼천","Aluminum sulfate 14-18H2O, crystal, 51.0-57.5%","A0486"],["황산마그네슘","99%","대정","Magnesium sulfate anhydrous, powder 99%","5514-4405"],["황산나트륨","99%","대정","Sodium sulfate anhydrous 99%","7630-4405"],["황산나트륨","99%","대정","Sodium sulfate anhydrous 99%","7630-4400"],["황산나트륨","99.0%","삼천","Sodium sulfate, anhydrous, 99.0%","S1013"],["아황산나트륨","96%","대정","Sodium sulfite anhydrous 96%","7634-4400"],["아황산수소나트륨","58.5%","삼천","Sodium bisulfite, 58.5%","S0373"],["싸이오황산나트륨","99%","대정","Sodium thiosulfate pentahydrate 99%","7639-4400"],["싸이오황산나트륨","95%","대정","Sodium thiosulfate anhydrous 95%","7640-4405"],["황산구리(II)","97.5%","대정","Copper(II) sulfate anhydrous 97.5%","2589-4405"],["황산구리(II)","≥98.0%","SIGMA","Copper(II) sulfate pentahydrate, ReagentPlus®, ≥98.0%","C7631"],["암모늄명반","99.0%","삼천","Aluminum ammonium sulfate dodecahydrate, 99.0%","A0384"],["황산망가니즈","98.0%","삼천","Manganese(II) sulfate monohydrate, 98.0%","M0277"],["황산망가니즈","98%","대정","Manganese(II) sulfate monohydrate 98%","5530-4405"],["과황산암모늄","98%","대정","Ammonium persulfate 98%","1077-4405"],["다이아황산나트륨","95.0%","삼천","Sodium metabisulfite, 95.0%","S0690"],["질산암모늄","98.5%","삼천","Ammonium nitrate, 98.5%","A0850"],["질산은","99.8%","삼천","Silver nitrate, 99.8%","S0229"],["질산은","99.8%","대정","Silver(I) nitrate 99.8%","7520-4105"],["질산은","99.8%","대정","Silver(I) nitrate 99.8%","7520-4125"],["질산아연","98.0%","삼천","Zinc nitrate hexahydrate, 98.0%","Z0055"],["질산알루미늄","98.0%","삼천","Aluminum nitrate nonahydrate, 98.0%","A2069"],["질산마그네슘","98%","대정","Magnesium nitrate hexahydrate 98%","5508-4405"],["질산크로뮴","98%","대정","Chromium(III) nitrate nonahydrate 98%","2555-4405"],["질산철","98%","대정","Iron(III) nitrate nonahydrate 98%","5023-4405"],["질산코발트","97.0%","삼천","Cobalt(II) nitrate hexahydrate, 97.0%","C0853"],["질산칼슘","97%","대정","Calcium nitrate tetrahydrate 97%","2514-4405"],["아질산 나트륨","98%","대정","Sodium nitrite 98%","7601-4405"],["탄산나트륨","≥99.5%","SIGMA","Sodium carbonate monohydrate, ACS reagent, ≥99.5%","230952"],["탄산나트륨","99%","대정","Sodium carbonate anhydrous 99%","7541-4405"],["탄산수소나트륨","99~100.5%","대정","Sodium hydrogen carbonate 99~100.5%","7566-4400"],["탄산수소나트륨","99.0-100.5%","삼천","Sodium bicarbonate, 99.0-100.5%","S0341"],["탄산칼슘","98.0%","삼천","Calcium carbonate, 98.0%","C0076"],["탄산칼슘","98%","대정","Calcium carbonate 98%","2505-4400"],["탄산칼륨","99.5%","대정","Potassium carbonate anhydrous 99.5%","6564-4400"],["중탄산암모늄","97%","대정","Ammonium bicarbonate 97%","1053-4405"],["탄산수소칼륨","99.5~100.5%","삼천","Potassium hydrogen carbonate 99.5~100.5%","P0714"],["탄산구리","53.5%","대정","Copper(II) carbonate basic 53.5%","2584-1405"],["황화아연","95%","Wako","Zinc sulfide 95%","269-00435"],["과망가니즈산칼륨","99.3%","대정","Potassium permanganate 99.3%","7722-64-7"],["싸이오시안산칼륨","99.0%","삼천","Potassium thiocyanate, 99.0%","P1220"],["아이오딘산칼륨","99.5%","대정","Potassium iodate 99.5%","6598-4405"],["수소화붕소나트륨","≥96%","SIGMA","Sodium borohydride, purum p.a., ≥96% (gas-volumetric)","71320"],["브로민화나트륨","99.0%","삼천","Sodium bromide, 99.0%","S0421"],["인산나트륨","99.0%","삼천","Trisodium phosphate dodecahydrate, 99.0%","S0919"],["인산나트륨","98.0%","삼천","Sodium phosphate, monobasic, anhydrous, 98.0%","S0909"],["염소산칼륨","99.5%","Kanto","Potassium chlorate 99.5%","32325-00"],["아자이드화나트륨","99.0%","삼천","Sodium azide, 99.0%","s2227"],["브로민화구리","98%","대정","Copper(II) bromide 98%","2583-4405"],["제1인산칼륨","99.0%","삼천","Potassium phosphate, monobasic, 99.0%","P1120"],["바나듐산암모늄","99%","대정","Ammonium metavanadate 99%","1072-4125"],["염소산나트륨","98%","대정","Sodium chlorate 98%","7547-1405"],["과당","98.0%","삼천","D(-)- Fructose, 98.0%","F0206"],["글리콜산","68.0-72.0%","Kanto","Glycolic acid solution, 68.0-72.0%","17035-01"],["옥살산","99.5~100.2%","대정","Oxalic acid dihydrate 99.5~100.2%","5640-4405"],["옥살산","99.0%","삼천","Oxalic acid dihydrate, 99.0%","O0091"],["살리실산","99.0%","삼천","Salicylic acid, 99.0%","S0043"],["살리실산","99%","대정","Salicylic acid 99%","7503-4400"],["벤조산","99.5%","대정","Benzoic acid 99.5%","2018-4405"],["벤조산","99.5%","대정","Benzoic acid 99.5%","2018-4400"],["스테아르산","95.0%","삼천","Stearic acid, 95.0%","S1228"],["아세트산나트륨","98.5%","삼천","Sodium acetate, anhydrous, 98.5%","S0292"],["옥살산나트륨","99%","대정","Sodium oxalate 99%","7603-4405"],["아스코브산","99.5%","대정","L-(+)-Ascorbic acid 99.5%","1099-4125"],["아스코브산","99.5%","삼천","L(+)- Ascorbic acid, 99.5%","A0019"],["벤조산나트륨","99%","대정","Sodium benzoate 99%","7531-4400"],["말론산","99%","대정","Malonic acid 99%","5654-4405"],["설파닐산","98.5%","대정","Sulfanilic acid 98.5%","7679-4405"],["팔미트산","95%","대정","Palmitic acid 95%","6502-4405"],["말레산","99%","대정","Maleic acid 99%","5519-4405"],["타타르산칼륨","99.0%","삼천","Potassium tartrate hemihydrate, 99.0%","P1206"],["아세트산; 빙초산","99.5%","삼천","Acetic acid / 99.5%","A0033"],["부티르산","99%","대정","Butyric acid 99%","2081-4405"],["나프탈렌","97%","대정","Naphthalene 97%","5596-1405"],["카페인",">98.5%","삼천","Caffeine, anhydrous,>98.5%","C1535"],["닌하이드린","98.0%","삼천","Ninhydrin, 98.0%","N1192"],["안트라센",">98.0%","삼천","Anthracene, >98.0%","a2263"],["아세트아닐리드","98.5%","대정","Acetanilide 98.5%","1001-1405"],["메틸렌블루","97%","대정","Methylene blue trihydrate 97%","5578-4105"],["페놀프탈레인","98.0%","삼천","Phenolphthalein, indicator, 98.0%","P1852"],["수산화나트륨",">98.0%","삼천","Sodium hydroxide, bead,>98.0%","S1508"],["암모니아수","25~30%","삼천","Ammonia solution, 25~30%","A0627"],["수산화칼륨","93%","대정","Potassium hydroxide, flakes 93%","6597-4400"],["황산","95%","대정","Sulfuric acid 95%","7683-4400"],["질산","70%","대정","Nitric acid 70%","5620-4400"],["설파민산","99.0%","삼천","Sulfamic acid, 99.0%","S1332"],["다이에틸에터","99%","대정","Ethyl ether 99%","4025-4405"],["에틸에테르","99%","대정","Ethyl ether 99%","4025-4405"],["프로필알코올","99.5%","대정","n-Propyl alcohol 99.5%","6628-4405"],["헥세인","95.0%","삼천","n- Hexane, 95.0%","H0112"],["헥세인","95%","대정","n-Hexane 95%","4081-4405"],["톨루엔","99.5%","삼천","Toluene, 99.5%","T0499"],["톨루엔","99.5%","대정","Toluene 99.5%","8541-4404"],["메틸피롤리돈","99.5%","삼천","1- Methyl-2-pyrrolidone, 99.5%","M0761"],["무수아세트산","97.0%","삼천","Acetic anhydride, 97.0%","A0069"],["염화메틸렌","99.5%","대정","Dichloromethane 99.5%","3030-4104"],["클로로폼","99.5%","대정","Chloroform 99.5%","2548-4405"],["다이메틸아닐린","99%","대정","N,N-Dimethylaniline 99%","3054-4405"],["페놀","99.0%","삼천","Phenol, 99.0%","P2707"],["트라이에탄올아민","99.0%","삼천","Triethanolamine, 99.0%","T0620"],["아세트알데하이드","90%","Kanto","Acetaldehyde 90%","01004-00"],["아세트산에틸",">99.7%","삼천","Ethyl acetate,>99.7%","E0647"],["아세트산에틸","99.5%","삼천","Ethyl acetate, 99.5%","E0189"],["아세트산뷰틸","99.5%","대정","Butyl acetate 99.5%","2075-4400"],["아세트산뷰틸","99.5%","대정","Butyl acetate 99.5%","2075-4405"],["아밀알코올","98%","대정","n-Amyl alcohol 98%","1085-4405"],["벤질알코올","99.5%","대정","Benzyl alcohol 99.5%","2023-4400"],["프로필렌글라이콜","99%","대정","Propylene glycol 99%","6629-4400"],["메틸에틸케톤","99.7%","대정","Methyl ethyl ketone 99.7%","5560-4105"],["석유에터","90.0%","삼천","Petroleum ether, 90.0% (D)","P0218"],["아크릴산에틸",">99.5%","삼천","Ethyl acrylate,>99.5%","E0843"],["벤즈알데하이드","97%","YAKURI","Benzaldehyde 97%","04032"],["4-아미노페놀","98.0%","삼천","4- Aminophenol, 98.0%","A0594"],["아세트산 프로필","99%","Acros","n-Propyl acetate, 99%, pure","15829"],["아세트아마이드",">99.0%","삼천","Acetamide,>99.0%","A1798"],["폼알데하이드","35%","삼천","Formaldehyde solution 35%","F0161"],["리튬","99%","Kanto","Lithium, lump in paraffin liquid 99%","24243-35"],["나트륨","99%","대정","Sodium, metal 99%","7647-1405"],["염소수","0.3%","Kanto","Chlorine water 0.3%","7782-50-5"],["다이크로뮴산칼륨","99.5%","삼천","Potassium dichromate, 99.5%","P0886"],["아이오딘화칼륨","99.5%","삼천","Potassium iodide, 99.5%","500p0014"]];
+
   const normalize = s => String(s || '').normalize('NFKC').toLowerCase()
     .replace(/[^a-z0-9가-힣]/g, '');
-  const lookup = new Map();
-  const suggestions = new Map();
-  const add = (rawName, rawFormula, override = false) => {
-    const key = normalize(rawName);
-    if (!key || !rawFormula) return;
-    if (override) lookup.set(key, { formula: rawFormula, ambiguous: false });
-    else if (!lookup.has(key)) lookup.set(key, { formula: rawFormula, ambiguous: false });
-    else if (lookup.get(key).formula !== rawFormula) lookup.set(key, { formula: '', ambiguous: true });
-    suggestions.set(key, rawName);
-  };
-  reagentRows.forEach(([ko, en, formula]) => { add(ko, formula); add(en, formula); });
-  Object.entries(forced).forEach(([key, formula]) => lookup.set(key, { formula, ambiguous: false }));
-  Object.entries(aliases).forEach(([name, formula]) => add(name, formula, true));
+  const decorate = raw => String(raw || '').split('·').map((p,i) => {
+    const sub = s => s.replace(/[0-9]/g, d => '₀₁₂₃₄₅₆₇₈₉'[Number(d)]);
+    if (i === 0) return sub(p);
+    const hydrate = p.match(/^(\d+)(.*)$/);
+    return hydrate ? hydrate[1] + sub(hydrate[2]) : sub(p);
+  }).join('·');
 
-  // 사용자가 한/영 이름을 일부 입력할 때 기존 필드 아래 브라우저 고유 자동 제안을 표시.
-  if (!input.hasAttribute('list')) {
-    const list = document.createElement('datalist');
-    list.id = 'sentry-chemical-name-suggestions';
-    suggestions.forEach(name => {
-      const option = document.createElement('option');
-      option.value = name;
-      list.appendChild(option);
+  // Existing KO/EN aliases remain available when not present in the provided PDF.
+  const legacy = new Map();
+  const addLegacy = (name,value) => {
+    const key=normalize(name); if(key && value && !legacy.has(key)) legacy.set(key,value);
+  };
+  reagentRows.forEach(([ko,en,f]) => { addLegacy(ko,f); addLegacy(en,f); });
+  Object.entries(forced).forEach(([k,v]) => legacy.set(normalize(k),v));
+  Object.entries(aliases).forEach(([k,v]) => legacy.set(normalize(k),v));
+
+  // All PDF entries: when a name identifies multiple different rows, refuse to guess.
+  const school = new Map();
+  const suggestions = new Map();
+  for (const [ko,en,f,code,category] of schoolRows) {
+    const candidate={ko,en,formula:f,code,category};
+    for(const name of [ko,en]) {
+      const key=normalize(name); if(!key) continue;
+      const list=school.get(key) || [];
+      if(!list.some(r=>r.ko===ko && r.en===en && r.formula===f && r.code===code)) list.push(candidate);
+      school.set(key,list); suggestions.set(key,name);
+    }
+  }
+  reagentRows.forEach(([ko,en]) => {for(const s of [ko,en]){const k=normalize(s);if(k&&!suggestions.has(k)) suggestions.set(k,s);}});
+
+  // Product purity is tied to a specific inventory entry, not an assumed value.
+  const purities = new Map();
+  productPurities.forEach(([name,value,vendor,product,sku]) => {
+    const key=normalize(name); if(!key || !value) return;
+    const item={value,vendor,product,sku};
+    const rows=purities.get(key)||[];
+    if(!rows.some(x=>x.value===value&&x.vendor===vendor&&x.sku===sku&&x.product===product)) rows.push(item);
+    purities.set(key,rows);
+  });
+
+  // Keep the existing input layout and browser-native searchable names.
+  let list=document.getElementById('sentry-chemical-name-suggestions');
+  if(!list) {
+    list=document.createElement('datalist'); list.id='sentry-chemical-name-suggestions';
+    (input.parentElement||document.body).appendChild(list);
+  }
+  for (const value of suggestions.values()) {
+    const option=document.createElement('option'); option.value=value; list.appendChild(option);
+  }
+  input.setAttribute('list',list.id);
+
+  const hint=document.createElement('small');
+  hint.className='field-hint'; hint.id='sentrySchoolLookupStatus';
+  hint.setAttribute('role','status'); hint.setAttribute('aria-live','polite');
+  hint.style.cssText='display:block;margin-top:6px;line-height:1.6';
+  (input.parentElement||input).appendChild(hint);
+  const status=txt=>{hint.textContent=txt;};
+
+  let productPicker=null;
+  if(concentration && concentration.parentElement) {
+    productPicker=document.createElement('select');
+    productPicker.id='sentryProductPurityPicker';
+    productPicker.setAttribute('aria-label','PDF 목록의 시약 제품별 농도·순도 선택');
+    productPicker.style.cssText='display:none;width:100%;margin-top:7px;box-sizing:border-box;padding:10px;border:1px solid #dce3ef;border-radius:9px;background:white;color:#24344d;font:inherit';
+    concentration.parentElement.appendChild(productPicker);
+    productPicker.addEventListener('change',()=>{
+      const option=productPicker.options[productPicker.selectedIndex];
+      if(option && option.value) {
+        concentration.value=option.value;
+        auto.concentration=option.value;
+        changed.concentration=false;
+        concentration.dataset.autofilled='school-inventory';
+        status('선택한 제품의 PDF 기재 농도·순도를 입력했습니다. 시약병의 실제 제품 라벨을 확인하세요.');
+      }
     });
-    input.setAttribute('list', list.id);
-    input.parentElement?.appendChild(list);
   }
 
-  const info = document.createElement('small');
-  info.className = 'field-hint';
-  info.id = 'formulaLookupStatus';
-  info.setAttribute('role', 'status');
-  info.setAttribute('aria-live', 'polite');
-  info.style.display = 'block';
-  info.style.marginTop = '5px';
-  input.parentElement?.appendChild(info);
-  const setStatus = text => { info.textContent = text; };
-
-  // 수화물 점(·) 뒤 숫자는 물 분자 수를 나타내는 계수이므로 아래첨자로 바꾸지 않음.
-  const sub = text => String(text).replace(/[0-9]/g, d => '₀₁₂₃₄₅₆₇₈₉'[Number(d)]);
-  const decorate = formula => String(formula).split('·').map((part, i) => {
-    if (i===0) return sub(part);
-    const matched = part.match(/^(\d+)(.*)$/);
-    return matched ? matched[1] + sub(matched[2]) : sub(part);
-  }).join('·');
-  let reqNum = 0, timer = null, controller = null, editing = false;
-  let autofilled = null;
-  const changeFormula = value => {
-    output.value = decorate(value);
-    autofilled = output.value;
-    output.dataset.autofilled = 'true';
-  };
-  output.addEventListener('input', () => {
-    editing = true;
-    autofilled = null;
-    delete output.dataset.autofilled;
-    setStatus('화학식을 직접 수정했습니다. 입력한 값이 우선 적용됩니다.');
-  });
-
-  const cancelPending = () => {
-    if (timer !== null) { clearTimeout(timer); timer = null; }
-    if (controller) { controller.abort(); controller = null; }
-  };
-  const processName = () => {
-    const token = ++reqNum;
-    cancelPending();
-    const value = input.value.trim();
-    const wasAuto = autofilled !== null;
-    const prevAuto = autofilled;
-    editing = false;
-    // 기존 app.js가 동일 input 이벤트에 등록한 자동완성 코드보다 마지막에 반영.
-    queueMicrotask(() => {
-      if (token !== reqNum) return;
-      const found = lookup.get(normalize(value));
-      if (found && !found.ambiguous && found.formula) {
-        changeFormula(found.formula);
-        setStatus('시약명과 화학식이 확인되었습니다. 수화물·용액 농도·제품 표기는 시약병 라벨과 SDS를 확인하세요.');
-        return;
+  let lastKey='', auto={formula:null,location:null,concentration:null};
+  let changed={formula:false,location:false,concentration:false};
+  for(const [name,element] of [['formula',formula],['location',location],['concentration',concentration]]) {
+    if(!element) continue;
+    element.addEventListener('input',()=>{ changed[name]=true; auto[name]=null; delete element.dataset.autofilled; });
+  }
+  function assign(element,field,value) {
+    if(!element) return;
+    if(changed[field]) return; // manual value always wins while keeping the same name
+    if(!value) {
+      if(auto[field]!==null && element.value===auto[field]) element.value='';
+      auto[field]=null; delete element.dataset.autofilled;
+      return;
+    }
+    element.value=value; auto[field]=value;
+    element.dataset.autofilled='school-inventory';
+  }
+  function resolvePDF(name) {
+    const items=school.get(normalize(name));
+    if(!items) return null;
+    const signatures=new Set(items.map(x=>x.formula+'|'+x.code));
+    return signatures.size===1 ? {record:items[0]} : {ambiguous:items};
+  }
+  let revision=0, controller=null, debounce=null;
+  function cancel() {
+    if(debounce){clearTimeout(debounce);debounce=null;}
+    if(controller){controller.abort();controller=null;}
+  }
+  function refresh() {
+    const ticket=++revision;
+    cancel();
+    // app.js uses the same input event; update afterwards without changing app.js.
+    queueMicrotask(()=>{
+      if(ticket!==revision) return;
+      const name=input.value.trim(), key=normalize(name);
+      if(key!==lastKey){
+        lastKey=key;
+        changed={formula:false,location:false,concentration:false};
       }
-      if (wasAuto && output.value === prevAuto) {
-        output.value = '';
-        delete output.dataset.autofilled;
+      if(productPicker){productPicker.style.display='none';productPicker.replaceChildren();}
+      if(!key){
+        assign(formula,'formula',''); assign(location,'location','');
+        assign(concentration,'concentration',''); status('');return;
       }
-      autofilled = null;
-      if (!value) { setStatus(''); return; }
-      if (found?.ambiguous) {
-        setStatus('같은 시약명으로 서로 다른 화학식이 확인됩니다. 수화물/제품 라벨을 확인하고 직접 입력하세요.');
-        return;
-      }
-      if (!/^[A-Za-z][A-Za-z\d ,()'\-.]{4,70}$/.test(value)) {
-        setStatus('현재 시약 목록에서 일치하는 이름을 찾지 못했습니다. 화학식을 직접 입력할 수 있습니다.');
-        return;
-      }
-      setStatus('기본 목록에 없는 영문 시약명입니다. PubChem 조회를 확인하고 있습니다…');
-      timer = setTimeout(() => {
-        if (token !== reqNum || editing) return;
-        controller = new AbortController();
-        const myController = controller;
-        const timeout = setTimeout(() => myController.abort(), 6500);
-        const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(value)}/property/MolecularFormula/JSON`;
-        fetch(url, { signal: myController.signal, headers: { Accept: 'application/json' } })
-          .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
-          .then(data => {
-            if (token !== reqNum || editing || input.value.trim() !== value) return;
-            const arr = data?.PropertyTable?.Properties;
-            if (!Array.isArray(arr) || arr.length !== 1 ||
-                !/^[A-Za-z0-9()\[\].+·\-]+$/.test(arr[0]?.MolecularFormula || '')) {
-              setStatus('PubChem에서 단일 분자식을 확인하지 못했습니다. 시약 라벨을 확인하고 직접 입력하세요.');
-              return;
+      const match=resolvePDF(name);
+      if(match && match.record){
+        const r=match.record;
+        assign(formula,'formula', r.formula ? decorate(r.formula) : '');
+        assign(location,'location',r.code); // classification only; not a verified physical shelf
+        const available=purities.get(normalize(r.ko))||[];
+        const uniq=[...new Set(available.map(x=>x.value))];
+        if(uniq.length===1) {
+          assign(concentration,'concentration',uniq[0]);
+        } else {
+          assign(concentration,'concentration','');
+          if(available.length && productPicker){
+            const start=document.createElement('option');
+            start.value='';start.textContent='제품별 농도·순도 선택 (PDF 재고 목록)';
+            productPicker.appendChild(start);
+            for(const x of available){
+              const option=document.createElement('option');
+              option.value=x.value;
+              option.textContent=`${x.value} · ${x.vendor||'제조사 미기재'} · ${x.product}${x.sku?' · '+x.sku:''}`;
+              productPicker.appendChild(option);
             }
-            changeFormula(arr[0].MolecularFormula);
-            setStatus('PubChem 분자식 조회 결과입니다. 실제 시약의 수화물·조성은 라벨에서 재확인하세요.');
-          })
-          .catch(() => {
-            if (token === reqNum && !editing) setStatus('외부 데이터 조회에 실패했습니다. 직접 화학식을 입력할 수 있습니다.');
-          })
-          .finally(() => { clearTimeout(timeout); if (controller === myController) controller = null; });
-      }, 650);
+            productPicker.style.display='block';
+          }
+        }
+        const loc=`${r.code} (${r.category})`;
+        if(!r.formula)status(`PDF 분류 ${loc} 확인. 화학식은 자료에서 확인되지 않아 수동 입력이 필요합니다.`);
+        else if(uniq.length>1)status(`PDF 화학식·분류 ${loc} 적용. 순도 후보가 여러 개이므로 제품 선택 또는 직접 입력이 필요합니다.`);
+        else if(uniq.length===1)status(`PDF 화학식·분류 ${loc}, 제품에 기재된 농도·순도 적용. 실제 용기 라벨을 확인하세요.`);
+        else status(`PDF 화학식·분류 ${loc} 적용. 이 시약의 확정 가능한 농도·순도는 미기재되어 직접 입력합니다.`);
+        return;
+      }
+      if(match && match.ambiguous){
+        assign(formula,'formula',''); assign(location,'location','');assign(concentration,'concentration','');
+        status('PDF에 같은 이름으로 서로 다른 화학식 또는 분류가 있어 자동 입력하지 않았습니다. 제품명을 더 구체적으로 입력하세요.');
+        return;
+      }
+      const backup=legacy.get(key);
+      assign(formula,'formula',backup?decorate(backup):'');
+      assign(location,'location','');assign(concentration,'concentration','');
+      if(backup){status('기존 시약 사전의 화학식을 적용했습니다. 학교 목록에 없는 이름이어서 분류와 순도는 자동 입력하지 않습니다.');return;}
+      if(!/^[A-Za-z][A-Za-z\d ,()'\-.]{4,70}$/.test(name)){
+        status('시약명과 일치하는 PDF 항목이 없습니다. 화학식·분류·농도는 직접 입력하세요.'); return;
+      }
+      status('기존 기능에 따라 PubChem 영문 분자식 조회를 시도합니다. 보관 위치·농도는 추정하지 않습니다.');
+      debounce=setTimeout(()=>{
+        if(ticket!==revision||changed.formula)return;
+        controller=new AbortController();const my=controller;
+        const deadline=setTimeout(()=>my.abort(),6500);
+        fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/MolecularFormula/JSON`,
+          {signal:my.signal,headers:{Accept:'application/json'}})
+        .then(r=>{if(!r.ok)throw Error('Not found');return r.json();})
+        .then(j=>{
+          if(ticket!==revision||changed.formula||input.value.trim()!==name)return;
+          const props=j?.PropertyTable?.Properties;
+          const result=props?.length===1?props[0].MolecularFormula:null;
+          if(result&&/^[A-Za-z0-9()\[\].+·\-]+$/.test(result)){
+            assign(formula,'formula',decorate(result));
+            status('PubChem 분자식 조회 결과입니다. PDF에 없는 항목으로 분류·순도는 입력하지 않았습니다.');
+          } else status('분자식을 확정할 수 없습니다. 직접 입력하세요.');
+        }).catch(()=>{if(ticket===revision)status('PubChem 조회 실패. 직접 화학식을 입력하세요.');})
+        .finally(()=>{clearTimeout(deadline);if(controller===my)controller=null;});
+      },700);
     });
-  };
-  input.addEventListener('input', processName);
-  input.addEventListener('change', processName);
-  const form = document.getElementById('reagentForm');
-  if (form) form.addEventListener('reset', () => {
-    ++reqNum; cancelPending(); editing = false; autofilled = null;
-    delete output.dataset.autofilled; setStatus('');
+  }
+  input.addEventListener('input',refresh);
+  input.addEventListener('change',refresh);
+  const form=document.getElementById('reagentForm');
+  if(form)form.addEventListener('reset',()=>{
+    ++revision;cancel();lastKey='';auto={formula:null,location:null,concentration:null};
+    changed={formula:false,location:false,concentration:false};
+    if(productPicker){productPicker.replaceChildren();productPicker.style.display='none';}
+    status('');
   });
-  // When a browser restores the form after navigation, fill the formula too.
-  if (input.value.trim()) processName();
+  if(input.value.trim())refresh();
 })();
