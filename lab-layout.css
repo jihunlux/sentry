@@ -1,0 +1,73 @@
+/* Experiment helper: four matching calculators, full-width guide and large AI card. */
+.lab-section .lab-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+.lab-section .lab-grid > .lab-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lab-section .lab-grid > .lab-panel:nth-child(-n+4) {
+  height: 640px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.lab-section .lab-panel-heading {
+  flex: 0 0 auto;
+  min-height: 76px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.lab-section .lab-panel-heading > div { min-width: 0; }
+.lab-section .lab-panel-heading h2 { line-height: 1.5; }
+.lab-section .lab-panel-heading p { line-height: 1.7; }
+.lab-section .lab-form { min-height: 300px; flex: 0 0 auto; }
+.lab-section .lab-form > .button { margin-top: auto; }
+.lab-section .lab-result {
+  flex: 1 1 140px;
+  min-height: 100px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.lab-section .lab-caution { flex: 0 0 auto; line-height: 1.8; }
+.lab-section .guide-panel {
+  grid-column: 1 / -1;
+}
+.lab-section .guide-panel .lab-panel-heading,
+.lab-section .ai-panel .lab-panel-heading { min-height: 0; }
+.lab-section .guide-panel .procedure-list {
+  columns: 2;
+  column-gap: 42px;
+}
+.lab-section .guide-panel .procedure-list li {
+  break-inside: avoid;
+  padding: 4px 0;
+}
+.lab-section .guide-panel .notice-box { margin-top: 18px; }
+.lab-section .ai-panel {
+  grid-column: 1 / -1;
+  min-height: 660px;
+}
+.lab-section .ai-panel > .ai-connection { align-self: flex-start; }
+.lab-section .ai-panel .ai-messages {
+  min-height: 230px;
+  max-height: 440px;
+  flex: 1 1 230px;
+}
+.lab-section .ai-panel .ai-form textarea {
+  min-height: 96px;
+}
+.lab-section .ai-panel .ai-submit-row .button { white-space: nowrap; }
+@media (max-width: 760px) {
+  .lab-section .lab-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .lab-section .guide-panel .procedure-list { columns: 1; }
+}
+@media (max-width: 420px) {
+  .lab-section .lab-grid > .lab-panel:nth-child(-n+4) { height: 720px; }
+  .lab-section .lab-form { min-height: 370px; }
+  .lab-section .lab-panel-heading { min-height: 88px; }
+}
+
