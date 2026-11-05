@@ -72,7 +72,7 @@
     if (!element) return;
     const review = needsReview(x);
     const live = !!x.sensorBound;
-    const liveNote = live ? (x.sensorFresh ? "실제 측정 · 수신 중" : "과거 측정 · 현재 상태 확인 불가") : "센서 미연결";
+    const liveNote = live ? (x.sensorFresh ? (x.sensorShared ? "계정 공유 · 최신 측정" : "실제 측정 · 수신 중") : "과거 측정 · 현재 상태 확인 불가") : "센서 미연결";
     const temp = temperatureState(x), rh = humidityState(x);
     const { cabinet, tilt, door } = positionStates(x);
     const stateField = (label, state, note) => `<div><small>${label}</small><b class="state-${state[1]}">${state[0]}</b><em class="${state[1] === "good" ? "good-text" : state[1] === "bad" ? "bad-text" : "unknown-text"}">${note}</em></div>`;
@@ -242,15 +242,45 @@
   if (menu && nav) menu.addEventListener("click", () => nav.classList.toggle("open"));
   window.addEventListener("sentry-sensor-update", render);
   window.addEventListener("sentry-reagents-changed", render);
+  let syncing = false, lastShared = "";
+  function updateSharedDisplay() {
+    const shared = all().map(x => window.SentryStore.overlay(x))
+      .filter(x => x.sensorShared)
+      .map(x => [x.id, x.receivedAt, x.sensorFresh]);
+    const signature = JSON.stringify(shared);
+    if (signature !== lastShared) {
+      lastShared = signature;
+      render();
+    }
+  }
+  async function syncSharedReadings() {
+    if (document.hidden) return;
+    updateSharedDisplay();
+    if (syncing || !window.SentryAuth.user) return;
+    syncing = true;
+    try {
+      await window.SentryStore.syncReadings();
+      $("sharedSensorStatus").textContent = "같은 계정의 센서값을 자동으로 확인하고 있습니다.";
+    } catch (_) {
+      $("sharedSensorStatus").textContent = "공유 센서값을 받지 못했습니다. 자동으로 다시 시도합니다.";
+    } finally {
+      syncing = false;
+      updateSharedDisplay();
+    }
+  }
+  document.addEventListener("visibilitychange", syncSharedReadings);
+  window.addEventListener("online", syncSharedReadings);
+  window.setInterval(syncSharedReadings, 2000);
   window.addEventListener("sentry-account-changing", () => { if (editor?.open) editor.close(); if (editor) editor.innerHTML = ""; });
   $("refreshAccountData").addEventListener("click", async () => {
     const button = $("refreshAccountData"); button.disabled = true;
     $("accountDataMessage").textContent = "계정 데이터를 불러오는 중입니다…";
-    try { await window.SentryStore.load(); render(); $("accountDataMessage").textContent = "최신 계정 데이터를 불러왔습니다. 저장된 센서값은 마지막 측정 기록입니다."; }
+    try { await window.SentryStore.load(); render(); $("accountDataMessage").textContent = "최신 계정 데이터를 불러왔습니다. 센서값은 자동으로 갱신됩니다."; }
     catch (error) { $("accountDataMessage").textContent = error.message; }
     finally { button.disabled = false; }
   });
   render();
+  syncSharedReadings();
 })();
 
 

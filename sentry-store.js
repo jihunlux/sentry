@@ -2,6 +2,11 @@
 (() => {
   "use strict";
   let owner = null, rows = [], versions = new Map(), readings = new Map(), revision = 0;
+  const sensorTimeout = 30000;
+  const isFresh = reading => {
+    const age = Date.now() - reading.receivedAt;
+    return age >= -5000 && age <= sensorTimeout;
+  };
   const clone = value => JSON.parse(JSON.stringify(value));
   const emit = () => window.dispatchEvent(new Event("sentry-reagents-changed"));
   const failure = (error, message = "계정에 저장하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.") => new Error(error?.message?.startsWith("계정") ? error.message : message);
@@ -28,7 +33,12 @@
     if (stamp !== revision) return;
     if (reagents.error || latest.error) throw failure(reagents.error || latest.error, "계정 데이터를 불러오지 못했습니다. 인터넷 연결과 서버의 데이터베이스 설정을 확인해 주세요.");
     rows = reagents.data.map(unpack); versions = new Map(reagents.data.map(x => [x.id, x.version]));
-    readings = new Map(latest.data.map(x => [x.reagent_id, { ...x.data, receivedAt: Date.parse(x.received_at) }]));
+    const currentReadings = readings;
+    readings = new Map(latest.data.map(x => {
+      const receivedAt = Date.parse(x.received_at);
+      const previous = currentReadings.get(x.reagent_id);
+      return [x.reagent_id, previous && previous.receivedAt > receivedAt ? previous : { ...x.data, receivedAt }];
+    }));
     emit();
   }
   async function add(item) {
@@ -67,11 +77,32 @@
     const { error } = await window.SentryAuth.client.from("sentry_sensor_latest").upsert({ user_id: id, reagent_id: reagentId, data: payload, received_at: new Date(reading.receivedAt).toISOString() }, { onConflict: "user_id,reagent_id" });
     same(id);
     if (error) throw failure(error, "센서값을 계정에 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
-    revision++; readings.set(reagentId, { ...payload, receivedAt: reading.receivedAt });
+    revision++;
+    if ((readings.get(reagentId)?.receivedAt ?? -Infinity) <= reading.receivedAt) {
+      readings.set(reagentId, { ...payload, receivedAt: reading.receivedAt });
+    }
+  }
+  async function syncReadings() {
+    const id = identity();
+    const { data, error } = await window.SentryAuth.client.from("sentry_sensor_latest")
+      .select("reagent_id,data,received_at").eq("user_id", id);
+    same(id);
+    if (error) throw failure(error, "공유 센서값을 불러오지 못했습니다.");
+    const registered = new Set(rows.map(row => row.id));
+    let changed = false;
+    for (const row of data) {
+      if (!registered.has(row.reagent_id)) continue;
+      const receivedAt = Date.parse(row.received_at);
+      const previous = readings.get(row.reagent_id);
+      if (!Number.isFinite(receivedAt) || (previous && receivedAt <= previous.receivedAt)) continue;
+      readings.set(row.reagent_id, { ...row.data, receivedAt });
+      changed = true;
+    }
+    return changed;
   }
   function overlay(item) {
     const reading = readings.get(String(item.id));
-    return !reading ? item : { ...item, ...clone(reading), cabinetStatus: "unknown", stateSource: "sensor", sensorBound: true, sensorFresh: false };
+    return !reading ? item : { ...item, ...clone(reading), cabinetStatus: "unknown", stateSource: "sensor", sensorBound: true, sensorFresh: isFresh(reading), sensorShared: true };
   }
   async function importRecords(items) {
     const id = identity();
@@ -83,5 +114,5 @@
     if (error) throw failure(error, "시약 파일을 계정에 저장하지 못했습니다. 기존 데이터는 변경되지 않았습니다.");
     revision++; rows.push(...data.map(unpack)); for (const x of data) versions.set(x.id, x.version); emit(); return data.length;
   }
-  window.SentryStore = { load, add, update, remove, saveReading, importRecords, overlay, clear, list: () => clone(rows) };
+  window.SentryStore = { load, add, update, remove, saveReading, syncReadings, importRecords, overlay, clear, list: () => clone(rows) };
 })();

@@ -60,7 +60,8 @@
   window.SentrySerial = {
     overlay(item) {
       if (!snapshot || String(item.id) !== boundId) return item;
-      return { ...item, ...snapshot, cabinetStatus: "unknown", stateSource: "sensor", sensorFresh: fresh(), sensorBound: true };
+      if (item.receivedAt > snapshot.receivedAt) return item;
+      return { ...item, ...snapshot, cabinetStatus: "unknown", stateSource: "sensor", sensorFresh: fresh(), sensorBound: true, sensorShared: false };
     }
   };
   function errorMessage(error) {
