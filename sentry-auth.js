@@ -51,7 +51,7 @@
       window.dispatchEvent(new Event("sentry-account-changing"));
     }
     user = next;
-    renderNavigation();
+    if (changed || !initialised) renderNavigation();
     if (initialised && changed && privatePage) location.replace(user ? location.pathname.split("/").pop() : loginUrl());
     window.dispatchEvent(new Event("sentry-auth-changed"));
   }
