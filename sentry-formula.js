@@ -1,7 +1,7 @@
-/* SENTRY 시약 자동 완성: 학교 시약목록 PDF 우선, 기존 한/영 사전 유지.
- * 변경: 화학식 PDF 원문 우선 (예: 주석판 = Sn foil), 대분류-소분류 코드 자동 입력,
- * 학교 재고표에 제품별 농도/순도가 명시된 경우만 자동 입력 / 제품 선택.
- * 다른 페이지, 저장 시약 데이터 및 스타일은 변경하지 않음.
+/* SENTRY 시약 등록: 자유 입력 허용 · 저장은 시약 분석 및 등록 버튼 클릭 시에만.
+ * PDF에 있는 시약은 한글/영문 자동 완성, PDF 화학식/대분류-소분류 및
+ * 제품별 표기 농도/순도를 기존대로 적용한다. 목록 외의 이름도 등록 가능하다.
+ * 기존 저장소, 보관 상태, 센서 데이터 및 타 페이지에는 영향을 주지 않는다.
  */
 (() => {
   "use strict";
@@ -25,28 +25,24 @@
     return hydrate ? hydrate[1] + sub(hydrate[2]) : sub(p);
   }).join('·');
 
-  // Existing KO/EN aliases remain available when not present in the provided PDF.
-  const legacy = new Map();
-  const addLegacy = (name,value) => {
-    const key=normalize(name); if(key && value && !legacy.has(key)) legacy.set(key,value);
-  };
-  reagentRows.forEach(([ko,en,f]) => { addLegacy(ko,f); addLegacy(en,f); });
-  Object.entries(forced).forEach(([k,v]) => legacy.set(normalize(k),v));
-  Object.entries(aliases).forEach(([k,v]) => legacy.set(normalize(k),v));
-
-  // All PDF entries: when a name identifies multiple different rows, refuse to guess.
+  // PDF lookup uses exact listed names; arbitrary names are still accepted on submit.
+  // Normalize whitespace/case for Korean and English lookup keys.
+  const whitelistKey = name => String(name || '').normalize('NFKC')
+    .toLowerCase().replace(/\s+/g, '').replace(/[‐‑‒–—−]/g, '-');
   const school = new Map();
   const suggestions = new Map();
   for (const [ko,en,f,code,category] of schoolRows) {
     const candidate={ko,en,formula:f,code,category};
-    for(const name of [ko,en]) {
-      const key=normalize(name); if(!key) continue;
-      const list=school.get(key) || [];
-      if(!list.some(r=>r.ko===ko && r.en===en && r.formula===f && r.code===code)) list.push(candidate);
-      school.set(key,list); suggestions.set(key,name);
+    for(const label of [ko,en]) {
+      if(!label || !String(label).trim()) continue;
+      const key=whitelistKey(label);
+      if(!key) continue;
+      const matches=school.get(key)||[];
+      if(!matches.some(r=>r.ko===ko && r.en===en && r.formula===f && r.code===code)) matches.push(candidate);
+      school.set(key,matches);
+      suggestions.set(key,String(label).trim());
     }
   }
-  reagentRows.forEach(([ko,en]) => {for(const s of [ko,en]){const k=normalize(s);if(k&&!suggestions.has(k)) suggestions.set(k,s);}});
 
   // Product purity is tied to a specific inventory entry, not an assumed value.
   const purities = new Map();
@@ -113,11 +109,16 @@
     element.dataset.autofilled='school-inventory';
   }
   function resolvePDF(name) {
-    const items=school.get(normalize(name));
+    const items=school.get(whitelistKey(name));
     if(!items) return null;
     const signatures=new Set(items.map(x=>x.formula+'|'+x.code));
     return signatures.size===1 ? {record:items[0]} : {ambiguous:items};
   }
+  // The browser's required attribute already checks for a blank reagent name.
+  // Clear any custom error that an older script may have assigned.
+  input.setCustomValidity('');
+  input.removeAttribute('aria-invalid');
+
   let revision=0, controller=null, debounce=null;
   function cancel() {
     if(debounce){clearTimeout(debounce);debounce=null;}
@@ -175,42 +176,43 @@
         status('PDF에 같은 이름으로 서로 다른 화학식 또는 분류가 있어 자동 입력하지 않았습니다. 제품명을 더 구체적으로 입력하세요.');
         return;
       }
-      const backup=legacy.get(key);
-      assign(formula,'formula',backup?decorate(backup):'');
-      assign(location,'location','');assign(concentration,'concentration','');
-      if(backup){status('기존 시약 사전의 화학식을 적용했습니다. 학교 목록에 없는 이름이어서 분류와 순도는 자동 입력하지 않습니다.');return;}
-      if(!/^[A-Za-z][A-Za-z\d ,()'\-.]{4,70}$/.test(name)){
-        status('시약명과 일치하는 PDF 항목이 없습니다. 화학식·분류·농도는 직접 입력하세요.'); return;
-      }
-      status('기존 기능에 따라 PubChem 영문 분자식 조회를 시도합니다. 보관 위치·농도는 추정하지 않습니다.');
-      debounce=setTimeout(()=>{
-        if(ticket!==revision||changed.formula)return;
-        controller=new AbortController();const my=controller;
-        const deadline=setTimeout(()=>my.abort(),6500);
-        fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/property/MolecularFormula/JSON`,
-          {signal:my.signal,headers:{Accept:'application/json'}})
-        .then(r=>{if(!r.ok)throw Error('Not found');return r.json();})
-        .then(j=>{
-          if(ticket!==revision||changed.formula||input.value.trim()!==name)return;
-          const props=j?.PropertyTable?.Properties;
-          const result=props?.length===1?props[0].MolecularFormula:null;
-          if(result&&/^[A-Za-z0-9()\[\].+·\-]+$/.test(result)){
-            assign(formula,'formula',decorate(result));
-            status('PubChem 분자식 조회 결과입니다. PDF에 없는 항목으로 분류·순도는 입력하지 않았습니다.');
-          } else status('분자식을 확정할 수 없습니다. 직접 입력하세요.');
-        }).catch(()=>{if(ticket===revision)status('PubChem 조회 실패. 직접 화학식을 입력하세요.');})
-        .finally(()=>{clearTimeout(deadline);if(controller===my)controller=null;});
-      },700);
+      // Unknown names are allowed, but are not given guessed formulas or purity.
+      assign(formula,'formula',''); assign(location,'location','');
+      assign(concentration,'concentration','');
+      status('학교 시약 목록에 없는 이름입니다. 직접 등록할 수 있으며, 화학식·보관 위치·순도는 확인 후 입력해 주세요.');
     });
   }
   input.addEventListener('input',refresh);
   input.addEventListener('change',refresh);
+  // app.js already owns the form's real submit/storage handler. Keep it unchanged.
+  // A browser's implicit Enter submission can also generate a click on the submit
+  // button; that synthetic keyboard click has event.detail === 0. Only accept a
+  // genuine mouse/touch/pen click on the visible submit button.
   const form=document.getElementById('reagentForm');
-  if(form)form.addEventListener('reset',()=>{
-    ++revision;cancel();lastKey='';auto={formula:null,location:null,concentration:null};
-    changed={formula:false,location:false,concentration:false};
-    if(productPicker){productPicker.replaceChildren();productPicker.style.display='none';}
-    status('');
-  });
+  if(form) {
+    const submitButton=form.querySelector('button[type="submit"]');
+    let clicked=false;
+    if(submitButton) {
+      submitButton.addEventListener('click',event=>{
+        clicked=event.isTrusted && event.detail>0;
+        // If native required-field validation stopped submission, avoid leaving
+        // a permission token that could accidentally authorize a later Enter.
+        setTimeout(()=>{clicked=false;},0);
+      },true);
+    }
+    // Capture phase executes before the existing app.js submit listener.
+    form.addEventListener('submit',event=>{
+      if(clicked) { clicked=false; return; }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
+    form.addEventListener('reset',()=>{
+      ++revision;cancel();lastKey='';auto={formula:null,location:null,concentration:null};
+      changed={formula:false,location:false,concentration:false};
+      input.setCustomValidity('');input.removeAttribute('aria-invalid');
+      if(productPicker){productPicker.replaceChildren();productPicker.style.display='none';}
+      status('');
+    });
+  }
   if(input.value.trim())refresh();
 })();
