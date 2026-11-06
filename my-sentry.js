@@ -1,4 +1,5 @@
-/* SENTRY dashboard: account-scoped cloud data, search, editing, delete and sensor advice. */
+/* SENTRY dashboard: account-scoped cloud data, search, editing, delete and sensor advice.
+   2026-11-06: display saved notes separately beside sensor information. */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -76,6 +77,9 @@
     const temp = temperatureState(x), rh = humidityState(x);
     const { cabinet, tilt, door } = positionStates(x);
     const stateField = (label, state, note) => `<div><small>${label}</small><b class="state-${state[1]}">${state[0]}</b><em class="${state[1] === "good" ? "good-text" : state[1] === "bad" ? "bad-text" : "unknown-text"}">${note}</em></div>`;
+    // Notes are saved as x.notes by both registration and the reagent editor.
+    // Displaying them with escaped text prevents saved HTML from affecting the page.
+    const memo = typeof x.notes === "string" && x.notes.trim() ? x.notes.trim() : "미입력";
     element.innerHTML = `<div class="inline-detail-inner">
       <div class="detail-top"><div><h3>${esc(x.name)} <small>${esc(x.formula || "화학식 미입력")}</small></h3><span class="status-pill ${review ? "status-bad" : "status-good"}">${badgeText(x)}</span></div>
         <span class="simulated-label">● ${liveNote}</span></div>
@@ -89,10 +93,11 @@
         <div><small>보관 조건</small><b>${esc(x.storage || "확인 필요")}</b><em>${x.storage ? "입력된 보관 조건" : "라벨·SDS 검토 필요"}</em></div>
         <div><small>물질 형태 · 농도</small><b>${esc(x.formType === "solid" ? "고체" : x.formType === "liquid" ? "액체·용액" : x.formType === "gas" ? "기체" : "형태 미선택")} · ${esc(x.concentration || "미입력")}</b><em>${esc(x.light || "광 노출 정보 없음")}</em></div>
       </div>
-      ${live ? `<p class="state-source-note">마지막 수신: ${esc(new Date(x.receivedAt).toLocaleString("ko-KR"))} · 적외선: ${x.irDetected ? "용기 감지됨" : "용기 감지되지 않음"} · 부저: ${x.buzzer ? "켜짐" : "꺼짐"}. ${liveNote}. 시약 안전성 판정과는 별개입니다.</p>` : ""}
+      ${live && x.receivedAt ? `<p class="state-source-note">마지막 수신: ${esc(new Date(x.receivedAt).toLocaleString("ko-KR"))} · 적외선: ${x.irDetected ? "용기 감지됨" : "용기 감지되지 않음"} · 부저: ${x.buzzer ? "켜짐" : "꺼짐"}. ${liveNote}. 시약 안전성 판정과는 별개입니다.</p>` : ""}
       <p class="state-source-note">보관함 센서는 용기 유무를 감지합니다. 보관 조건은 제품 라벨과 SDS를 확인하세요.</p>
+      <div class="notice-box sentry-notes-display" aria-label="용기·기타 메모"><span>✎</span><div style="min-width:0;flex:1"><b>용기·기타 메모</b><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0">${esc(memo)}</p></div></div>
       <h4 class="detail-subtitle">추가 센서 정보</h4><div class="optional-detail-list">${sensorInfo(x).map(o => `<div class="optional-detail"><b>${esc(o[0])}</b><span>${esc(o[1])}</span><small>${esc(o[2])}</small></div>`).join("")}</div>
-      <div class="notice-box"><span>ⓘ</span><p>${esc(x.notes || "추가 메모 없음")} 실제 보관·취급 전에 제품 라벨과 SDS를 확인하세요.</p></div>
+      <div class="notice-box"><span>ⓘ</span><p>실제 보관·취급 전에 제품 라벨과 SDS를 확인하세요.</p></div>
       <div class="detail-actions"><button type="button" class="button secondary small" data-edit>시약 정보 편집</button><button type="button" class="button danger small" data-delete>시약 삭제</button></div>
       </div>`;
     element.classList.add("expanded");
@@ -282,5 +287,3 @@
   render();
   syncSharedReadings();
 })();
-
-
