@@ -7,13 +7,15 @@
   let selected = null;
 
   function all() { return window.SentryStore.list(); }
+  // Stored readings keep the firmware polarity. Reverse it for dashboard decisions.
+  const isTilted = x => x.tiltStatus === "upright";
   function positionStates(x) {
     const pending = [x.sensorBound ? "수신 대기" : "센서 미연결", "unknown"];
     if (!x.sensorBound || !x.sensorFresh) return { cabinet: pending, tilt: pending, door: pending };
     const cabinet = x.irDetected === true ? ["용기 감지됨", "good"] :
       x.irDetected === false ? ["용기 미감지", "bad"] : ["정보 없음", "unknown"];
-    const tilt = x.tiltStatus === "upright" ? ["정상적으로 서 있음", "good"] :
-      x.tiltStatus === "tilted" ? ["기울어짐", "bad"] : ["정보 없음", "unknown"];
+    const tilt = x.tiltStatus === "tilted" ? ["정상적으로 서 있음", "good"] :
+      isTilted(x) ? ["기울어짐", "bad"] : ["정보 없음", "unknown"];
     const door = x.open === true ? ["열림", "bad"] :
       x.open === false ? ["닫힘", "good"] : ["정보 없음", "unknown"];
     return { cabinet, tilt, door };
@@ -39,7 +41,7 @@
     const reasons = [];
     if (x.open === true) reasons.push("개폐 센서 열림");
     if (x.irDetected === false) reasons.push("용기 미감지");
-    if (x.tiltStatus === "tilted") reasons.push("용기 기울어짐");
+    if (isTilted(x)) reasons.push("용기 기울어짐");
     const reason = temperatureState(x)[2];
     if (reason) reasons.push("온도 " + reason);
     return reasons;

@@ -33,7 +33,7 @@
       $("serialHumidity").textContent = Number.isFinite(snapshot.humidity)
         ? `${snapshot.humidity.toFixed(1)} %RH${current ? "" : " · 과거 측정"}` : "—";
       $("serialDoor").textContent = snapshot.open ? "열림" : "닫힘";
-      $("serialTilt").textContent = snapshot.tiltStatus === "tilted" ? "기울어짐" : "정상적으로 서 있음";
+      $("serialTilt").textContent = snapshot.tiltStatus === "upright" ? "기울어짐" : "정상적으로 서 있음";
       $("serialIR").textContent = snapshot.irDetected ? "용기 감지됨" : "용기 감지되지 않음";
       $("serialBuzzer").textContent = snapshot.buzzer ? "켜짐" : "꺼짐";
     } else {
