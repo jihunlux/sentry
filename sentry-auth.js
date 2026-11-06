@@ -3,6 +3,9 @@
   "use strict";
   let client = null, user = null, initialised = false, configurationError = "";
   const privatePage = document.body.hasAttribute("data-sentry-private");
+  const publicHome = document.body.hasAttribute("data-sentry-public-home");
+  const internalVisit = document.referrer.startsWith(new URL("./", location.href).href);
+  const resetHomeSession = publicHome && !internalVisit;
   const links = [["my-sentry.html", "나의 SENTRY"], ["register.html", "시약 등록"], ["lab-tool.html", "실험 도우미"], ["index.html#sensor-guide", "센서 안내"]];
   function validConfig(config) {
     if (!config || !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(config.supabaseUrl || "")) return false;
@@ -83,7 +86,11 @@
       client.auth.onAuthStateChange((_event, session) => { if (initialised) applySession(session); });
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
-      applySession(data.session); initialised = true;
+      if (resetHomeSession && data.session) {
+        const { error: signOutError } = await client.auth.signOut({ scope: "local" });
+        if (signOutError) throw signOutError;
+      }
+      applySession(resetHomeSession ? null : data.session); initialised = true;
       return user;
     } catch (_) {
       configurationError = "로그인 서비스에 연결하지 못했습니다. 인터넷 연결과 서버 설정을 확인해 주세요.";
